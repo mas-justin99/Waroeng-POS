@@ -224,7 +224,7 @@ class Database extends Config
                 // Neon: libpq lama (mis. PHP di Windows/Laragon) tak mengirim SNI -> sebutkan endpoint secara eksplisit.
                 if (! empty($q['options'])) {
                     $this->default['options'] = $q['options'];
-                } elseif (preg_match('/^(ep-[a-z0-9-]+?)(-pooler)?\./i', $p['host'] ?? '', $m) && str_contains((string) $p['host'], 'neon.tech')) {
+                } elseif (preg_match('/^(ep-[a-z0-9-]+)\./i', $p['host'] ?? '', $m) && str_contains((string) $p['host'], 'neon.tech')) {
                     $this->default['options'] = 'endpoint=' . $m[1];
                 }
             }
