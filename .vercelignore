@@ -1,0 +1,11 @@
+.env
+.git
+.github
+tests
+builds
+writable/cache/*
+writable/logs/*
+writable/session/*
+writable/debugbar/*
+public/uploads
+*.log
