@@ -11,7 +11,7 @@
   <form class="login-card" method="post" action="/login" id="lf">
     <?= csrf_field() ?>
     <img class="logo" src="<?= base_url('assets/img/logo.png') ?>" onerror="this.onerror=null;this.src='<?= base_url('assets/img/logo.svg') ?>'" alt="Waroeng Mbok Reneo">
-    <h4 class="text-center mb-1">Waroeng Mbok Reneo</h4>
+    <h4 class="text-center mb-1">Waroeng Mbok ReneO</h4>
     <p class="text-center text-muted mb-4">Masuk ke sistem kasir & backoffice</p>
     <?php if ($m = session()->getFlashdata('error')): ?><div class="alert-x err"><i class="bi bi-exclamation-circle-fill"></i><span><?= esc($m) ?></span></div><?php endif; ?>
     <?php if ($m = session()->getFlashdata('success')): ?><div class="alert-x ok"><i class="bi bi-check-circle-fill"></i><span><?= esc($m) ?></span></div><?php endif; ?>
