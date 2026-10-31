@@ -42,7 +42,7 @@ class DatabaseSeeder extends Seeder
                 ['GOPAY', 'GoPay', 'ewallet'], ['OVO', 'OVO', 'ewallet'], ['DANA', 'DANA', 'ewallet'],
                 ['SHOPEEPAY', 'ShopeePay', 'ewallet'], ['LINKAJA', 'LinkAja', 'ewallet'],
                 ['GOFOOD', 'GoFood', 'online'], ['GRABFOOD', 'GrabFood', 'online'], ['SHOPEEFOOD', 'ShopeeFood', 'online'],
-                ['VOUCHER', 'Voucher', 'other'], ['OTHER', 'Lainnya', 'other'],
+                ['DP', 'DP Reservasi', 'dp'], ['VOUCHER', 'Voucher', 'other'], ['OTHER', 'Lainnya', 'other'],
             ];
             foreach ($m as $i => [$c, $n, $t]) {
                 $db->table('payment_methods')->insert(['code' => $c, 'name' => $n, 'type' => $t, 'sort' => $i, 'is_active' => 1]);

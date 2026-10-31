@@ -58,7 +58,19 @@ class SalesService
                 $amt = (float) ($pm['amount'] ?? 0);
                 $m = $methods[(int) ($pm['method_id'] ?? 0)] ?? null;
                 if ($amt <= 0 || ! $m) continue;
-                $pays[] = ['m' => $m, 'amount' => $amt, 'ref' => trim((string) ($pm['reference'] ?? '')) ?: null];
+                $rsv = null;
+                if ($m['type'] === 'dp') {
+                    // DP reservasi: kunci baris reservasi agar tidak dipakai dua kali
+                    $rid = (int) ($pm['reservation_id'] ?? 0);
+                    if (in_array($rid, array_column($pays, 'rid'), true)) throw new RuntimeException('Reservasi yang sama tidak bisa dipakai dua kali.');
+                    $rsv = $db->query('SELECT * FROM reservations WHERE id = ? AND location_id = ? FOR UPDATE', [$rid, $locId])->getRowArray();
+                    if (! $rsv || in_array($rsv['status'], ['cancelled', 'no_show'], true)) throw new RuntimeException('Reservasi untuk DP tidak valid.');
+                    if (! empty($rsv['dp_sale_id'])) throw new RuntimeException('DP reservasi ' . $rsv['customer_name'] . ' sudah dipakai.');
+                    if ((float) $rsv['dp_amount'] <= 0) throw new RuntimeException('Reservasi ini tidak memiliki DP.');
+                    $amt = min($amt, (float) $rsv['dp_amount']);
+                }
+                $pays[] = ['m' => $m, 'amount' => $amt, 'rid' => $rsv['id'] ?? null, 'rsv' => $rsv,
+                    'ref' => $rsv ? 'DP ' . $rsv['customer_name'] . ' (' . date('d/m H:i', strtotime($rsv['reserved_at'])) . ')' : (trim((string) ($pm['reference'] ?? '')) ?: null)];
                 $tender += $amt;
                 if ($m['type'] === 'cash') $cashTender += $amt;
             }
@@ -108,8 +120,13 @@ class SalesService
                 if ($amt <= 0) continue;
                 $db->table('sale_payments')->insert([
                     'sale_id' => $saleId, 'method_id' => $p['m']['id'], 'method_name' => $p['m']['name'],
-                    'amount' => $amt, 'reference' => $p['ref'],
+                    'amount' => $amt, 'reference' => $p['ref'], 'reservation_id' => $p['rid'],
                 ]);
+                if ($p['rid']) {
+                    $upd = ['dp_sale_id' => $saleId, 'updated_at' => $now];
+                    if (in_array($p['rsv']['status'], ['booked', 'confirmed'], true)) { $upd['status'] = 'arrived'; $upd['ack_at'] = $now; }
+                    $db->table('reservations')->where('id', $p['rid'])->update($upd);
+                }
             }
 
             if (! $db->transStatus()) throw new RuntimeException('Gagal menyimpan transaksi.');
@@ -133,6 +150,8 @@ class SalesService
                     'Void ' . $s['invoice_no'], $userId, (float) $it['cost'], true);
             }
             $db->table('sales')->where('id', $saleId)->update(['status' => 'void', 'void_reason' => $reason]);
+            // DP yang dipakai transaksi ini dikembalikan ke reservasi (bisa dipakai lagi)
+            $db->table('reservations')->where('dp_sale_id', $saleId)->update(['dp_sale_id' => null, 'updated_at' => date('Y-m-d H:i:s')]);
             $db->transCommit();
         } catch (\Throwable $e) {
             $db->transRollback();

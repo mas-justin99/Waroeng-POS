@@ -35,10 +35,10 @@ class Products extends BaseController
         ];
         $file = $this->request->getFile('image');
         if ($file && $file->isValid() && ! $file->hasMoved()) {
-            if (! in_array($file->getMimeType(), ['image/jpeg', 'image/png', 'image/webp'], true) || $file->getSize() > 5 * 1024 * 1024) {
-                return $this->back('/admin/products', 'Gambar harus JPG/PNG/WEBP maksimal 5MB.', 'error');
+            if (! in_array($file->getMimeType(), ['image/jpeg', 'image/png', 'image/webp'], true) || $file->getSize() > 12 * 1024 * 1024) {
+                return $this->back('/admin/products', 'Gambar harus JPG/PNG/WEBP maksimal 12MB.', 'error');
             }
-            [$url, $err] = Cloud::upload($file->getTempName());
+            [$url, $err] = Cloud::upload($file->getTempName(), 'waroeng-mbok-reneo', 800);
             if ($err) return $this->back('/admin/products', $err, 'error');
             $data['image_url'] = $url;
         }

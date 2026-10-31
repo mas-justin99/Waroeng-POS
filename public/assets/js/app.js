@@ -126,6 +126,45 @@
     document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
   }
 
+
+  // ---- Kompres foto otomatis sebelum diunggah (hemat kuota & lolos batas 4,5 MB Vercel)
+  (function () {
+    const MAX = 1600, Q = 0.8;
+    const kb = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.round(n / 1024) + ' KB';
+    async function load(file) {
+      if (window.createImageBitmap) { try { return await createImageBitmap(file, { imageOrientation: 'from-image' }); } catch (e) {} }
+      return await new Promise((ok, no) => { const u = URL.createObjectURL(file), i = new Image(); i.onload = () => { URL.revokeObjectURL(u); ok(i); }; i.onerror = no; i.src = u; });
+    }
+    function hint(inp, msg, err) {
+      let h = inp.parentNode.querySelector('.img-hint');
+      if (!h) { h = document.createElement('div'); h.className = 'form-text img-hint'; inp.insertAdjacentElement('afterend', h); }
+      h.textContent = msg; h.style.color = err ? '#b45309' : '';
+    }
+    document.addEventListener('change', async e => {
+      const inp = e.target;
+      if (!(inp instanceof HTMLInputElement) || inp.type !== 'file' || !/image/.test(inp.accept || '') || !inp.files || !inp.files[0]) return;
+      const f = inp.files[0];
+      if (!/^image\/(jpeg|png|webp)$/.test(f.type)) return;
+      inp.dataset.busy = '1'; hint(inp, 'Mengompres foto…');
+      try {
+        const img = await load(f), w = img.width || img.naturalWidth, h = img.height || img.naturalHeight;
+        const k = Math.min(1, MAX / Math.max(w, h));
+        const cv = document.createElement('canvas'); cv.width = Math.max(1, Math.round(w * k)); cv.height = Math.max(1, Math.round(h * k));
+        const cx = cv.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height); cx.drawImage(img, 0, 0, cv.width, cv.height);
+        const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', Q));
+        if (blob && (blob.size < f.size || k < 1)) {
+          const nf = new File([blob], f.name.replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg', lastModified: Date.now() });
+          const dt = new DataTransfer(); dt.items.add(nf); inp.files = dt.files;
+          hint(inp, 'Foto dikompres otomatis: ' + kb(f.size) + ' → ' + kb(nf.size));
+        } else hint(inp, 'Foto ' + kb(f.size) + ' (sudah kecil)');
+      } catch (err) { hint(inp, 'Foto dikirim apa adanya (' + kb(f.size) + ').', true); }
+      delete inp.dataset.busy;
+    });
+    document.addEventListener('submit', e => {
+      if (e.target.querySelector && e.target.querySelector('input[type=file][data-busy]')) { e.preventDefault(); Toast.show('Tunggu sebentar, foto sedang dikompres.', 'err'); }
+    }, true);
+  })();
+
   // ---- Service worker (PWA ringan, hanya aset statis)
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('/sw.js').catch(() => {});
 

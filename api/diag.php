@@ -4,7 +4,7 @@ header('Content-Type: text/plain; charset=utf-8');
 $root = dirname(__DIR__);
 $ok = fn ($b) => $b ? 'OK  ' : 'GAGAL';
 echo "== PHP ==\nversi: " . PHP_VERSION . "\n";
-foreach (['pgsql', 'pdo_pgsql', 'mbstring', 'intl', 'curl', 'openssl', 'json'] as $e) echo $ok(extension_loaded($e)) . " ekstensi $e\n";
+foreach (['pgsql', 'pdo_pgsql', 'mbstring', 'intl', 'curl', 'openssl', 'json', 'gd', 'exif'] as $e) echo $ok(extension_loaded($e)) . " ekstensi $e\n";
 echo "\n== File ==\n";
 foreach (['app/Config/Paths.php', 'vendor/autoload.php', 'vendor/codeigniter4/framework/system/Boot.php', 'public/index.php'] as $f) echo $ok(is_file("$root/$f")) . " $f\n";
 echo $ok(is_dir('/tmp') && is_writable('/tmp')) . " /tmp bisa ditulis\n";
@@ -22,7 +22,7 @@ if ($url) {
     if (! $p || empty($p['host'])) { echo "GAGAL DATABASE_URL tidak bisa dibaca (ada tanda kutip / awalan 'psql' / karakter aneh?). Awal nilai: " . substr($url, 0, 12) . "...\n"; exit; }
     echo "scheme=" . ($p['scheme'] ?? '?') . " host=" . $p['host'] . " db=" . ltrim($p['path'] ?? '', '/') . " user=" . ($p['user'] ?? '?') . "\n";
     if (extension_loaded('pgsql')) {
-        $opt = preg_match('/^(ep-[a-z0-9-]+?)(-pooler)?\./i', $p['host'], $m) ? " options='endpoint={$m[1]}'" : '';
+        $opt = preg_match('/^(ep-[a-z0-9-]+)\./i', $p['host'], $m) ? " options='endpoint={$m[1]}'" : '';
         $dsn = "host={$p['host']} port=" . ($p['port'] ?? 5432) . " user={$p['user']} password='" . urldecode($p['pass'] ?? '') . "' dbname=" . ltrim($p['path'], '/') . " sslmode=require connect_timeout=8" . $opt;
         $c = @pg_connect($dsn);
         if ($c) {

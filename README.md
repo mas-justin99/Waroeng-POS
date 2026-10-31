@@ -25,6 +25,8 @@ Tampilan terinspirasi LunaPOS / Jubelio POS: bersih, cepat dipelajari, dan diopt
 - **Buka / Tutup Kasir (2 shift per hari):** sebelum berjualan kasir wajib memilih **Shift 1 (Pagi)** atau **Shift 2 (Sore)**, mengisi **uang modal**, dan **menghitung stok awal** semua menu (angka sudah terisi sesuai sistem; selisih otomatis dicatat sebagai penyesuaian stok). Halaman Kasir terkunci sampai kasir dibuka. Saat tutup, kasir mengisi uang kas hasil hitung; sistem menampilkan selisih terhadap *modal + penjualan tunai*, mencatat stok akhir, dan menyimpan rekap di **Riwayat Shift** (bisa dicetak). Satu lokasi hanya boleh punya satu shift terbuka, dan tiap shift hanya bisa dibuka sekali per hari.
 - **Struk Penutupan Shift:** begitu kasir menekan *Tutup Kasir*, muncul struk 80 mm berisi omset (subtotal, diskon, pajak, service, total), jumlah transaksi & porsi terjual, void, rincian per metode bayar, uang kasir (modal, penjualan tunai, seharusnya di laci, hasil hitung, **selisih**), daftar menu terjual, sisa stok akhir, serta kolom tanda tangan. Bisa dicetak ulang dari *Riwayat Shift* (pratinjau juga tersedia saat shift masih berjalan).
 - **Reservasi + pengingat:** menu *Reservasi* (kasir, dapur, admin) untuk mencatat nama, no. HP, tanggal & jam, jumlah orang, meja, DP, dan catatan. Tab *Hari Ini / Mendatang / Lewat*, status (Dipesan → Terkonfirmasi → Datang / Tidak datang / Batal). Pengingat bisa diatur (tepat waktu, 15/30 menit, 1/2/3 jam, atau 1 hari sebelumnya): kartu pengingat muncul di layar + bunyi/getar + lencana di menu, sampai kasir menekan *Sudah diingatkan*. Tersedia tombol **WhatsApp** untuk mengirim pesan pengingat ke pelanggan. Hanya kasir/admin yang bisa input; dapur hanya melihat.
+- **DP reservasi:** nominal DP dicatat di form reservasi bersama **foto bukti/struk DP** (opsional). Di kasir ada metode bayar **DP Reservasi**: pilih reservasi pelanggan, nominal DP otomatis memotong tagihan (bisa digabung dengan tunai/QRIS/dll). Satu DP hanya bisa dipakai sekali; reservasi otomatis berstatus *Sudah datang*; bila transaksi di-void, DP kembali bisa dipakai. DP tidak dihitung sebagai uang tunai di laci saat tutup kasir, dan muncul sebagai baris "DP Reservasi" di struk penutupan. Jika DP lebih besar dari tagihan, hanya sebesar tagihan yang terpotong (sisanya perlu dikembalikan ke pelanggan secara manual).
+- **Kompres foto otomatis:** setiap unggah foto (foto produk, bukti DP) dikecilkan dulu di HP/browser (maks. 1600 px, JPEG ±80%) sehingga hemat kuota dan lolos batas unggah Vercel (4,5 MB), lalu dikompres lagi di server (GD) dan di Cloudinary. Foto 3 MB dari kamera HP biasanya menjadi sekitar 300-500 KB.
 - Multi lokasi: stok, PO, penjualan, pajak/service, dan footer struk terpisah per outlet. Admin dapat berpindah lokasi dari bar atas.
 - Peran: **Admin/Owner** (backoffice, semua lokasi), **Kasir**, **Dapur** (terkunci di lokasinya).
 - **1 akun = 1 perangkat.** Login di perangkat kedua ditolak selama perangkat pertama aktif; perangkat yang sama boleh login ulang. Admin bisa *Paksa Logout*.
@@ -50,13 +52,13 @@ Tampilan terinspirasi LunaPOS / Jubelio POS: bersih, cepat dipelajari, dan diopt
 ## 1. Setup lokal dengan Laragon
 
 1. Letakkan folder proyek di `C:\laragon\www\waroeng-pos`.
-2. Pastikan PHP Laragon ≥ 8.2 dengan ekstensi `intl`, `mbstring`, `curl` (dan `pgsql` bila memakai Postgres/Neon). Cek lewat *Menu → PHP → Extensions*.
+2. Pastikan PHP Laragon ≥ 8.2 dengan ekstensi `intl`, `mbstring`, `curl`, `gd` (kompres foto), `exif` (dan `pgsql` bila memakai Postgres/Neon). Cek lewat *Menu → PHP → Extensions*.
 3. Jalankan Laragon → **Start All**, lalu buat database kosong `waroeng_pos` (HeidiSQL / *Menu → Database*).
 4. Buka **Terminal Laragon** di folder proyek:
    ```bash
    composer install
    copy .env.example .env          # lalu cek DATABASE_URL di dalamnya
-   php spark migrate                 # termasuk tabel shift & reservasi
+   php spark migrate                 # termasuk tabel shift, reservasi & DP
    php spark db:seed DatabaseSeeder  # data awal: lokasi, akun, metode bayar, contoh menu
    php spark db:seed DemoSeeder      # (opsional) stok & transaksi 14 hari agar dashboard terisi
    ```

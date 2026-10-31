@@ -90,15 +90,20 @@
     <button class="btn btn-primary w-100" id="ok-new"><i class="bi bi-plus-lg"></i> Transaksi Baru</button>
   </div>
 </div></div></div>
+<div class="modal fade" id="dpModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">DP Reservasi</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body"><div class="small text-muted mb-2">Pilih reservasi pelanggan yang sudah membayar DP. Nominal DP dipotong dari tagihan.</div><div id="dpList" class="d-grid gap-2"></div></div>
+</div></div></div>
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
 <script>
 window.POS = {
   products: <?= json_encode($products, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>,
+  dps: <?= json_encode($dps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>,
   methods: <?= json_encode($methods, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>,
   tax: <?= $tax ?>, service: <?= $service ?>
 };
 </script>
-<script src="<?= base_url('assets/js/pos.js') ?>?v=1"></script>
+<script src="<?= base_url('assets/js/pos.js') ?>?v=3"></script>
 <?= $this->endSection() ?>

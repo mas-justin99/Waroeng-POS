@@ -20,7 +20,7 @@
     <div class="col-12"><label class="form-label">Nama menu</label><input name="name" class="form-control" required></div>
     <div class="col-6"><label class="form-label">Harga jual</label><input name="price" type="number" min="0" step="any" class="form-control" required data-default="0"></div>
     <div class="col-6"><label class="form-label">HPP standar</label><input name="hpp" type="number" min="0" step="any" class="form-control" required data-default="0"></div>
-    <div class="col-12"><label class="form-label">Foto (opsional, diunggah ke Cloudinary)</label><input name="image" type="file" accept="image/*" class="form-control"></div>
+    <div class="col-12"><label class="form-label">Foto (opsional, otomatis dikompres)</label><input name="image" type="file" accept="image/*" class="form-control"></div>
   </div></div>
   <div class="modal-footer"><button class="btn btn-primary w-100">Simpan</button></div></form></div></div>
 <?= $this->endSection() ?>

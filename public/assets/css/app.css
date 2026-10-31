@@ -243,3 +243,7 @@ a{color:var(--primary);text-decoration:none} a:hover{color:var(--primary-600)}
 .rsv-alert{background:#fff;border:1px solid var(--primary);border-left-width:5px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.18);padding:10px 12px}
 .rsv-alert .t{font-weight:700;color:var(--primary)}.rsv-alert .b{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
 .nav-dot{background:var(--primary);color:#fff;border-radius:999px;font-size:.65rem;padding:1px 6px;margin-left:6px}
+
+/* ---- Pilih DP reservasi di kasir */
+.dp-item{display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left;width:100%;background:#fff;border:1px solid var(--bs-border-color,#e5e1dc);border-radius:12px;padding:10px 12px}
+.dp-item:active,.dp-item:hover{border-color:var(--primary);background:var(--primary-soft,#fdecee)}

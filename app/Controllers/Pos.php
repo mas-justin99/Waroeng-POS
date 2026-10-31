@@ -28,6 +28,9 @@ class Pos extends BaseController
             'products' => $products,
             'categories' => $this->db->table('categories')->orderBy('name')->get()->getResultArray(),
             'methods' => $this->db->table('payment_methods')->where('is_active', 1)->orderBy('sort')->get()->getResultArray(),
+            'dps' => $this->db->query("SELECT id, customer_name AS name, reserved_at, pax, table_no, dp_amount AS amount FROM reservations
+                WHERE location_id = ? AND dp_amount > 0 AND dp_sale_id IS NULL AND status IN ('booked','confirmed','arrived') AND reserved_at >= ?
+                ORDER BY reserved_at LIMIT 80", [$loc, date('Y-m-d 00:00:00', strtotime('-1 day'))])->getResultArray(),
             'tax' => (float) ($l['tax_percent'] ?? 0), 'service' => (float) ($l['service_percent'] ?? 0),
         ]);
     }

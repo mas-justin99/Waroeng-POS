@@ -61,14 +61,25 @@ class Reservations extends BaseController
         if (! in_array($rm, [0, 15, 30, 60, 120, 180, 1440], true)) $rm = 60;
         if (! $id && $ts < time() - 300) return $this->back('/reservations', 'Jam reservasi sudah lewat. Pilih waktu yang akan datang.', 'error')->withInput();
 
+        $proofUrl = null;
+        $file = $this->request->getFile('dp_proof');
+        if ($file && $file->isValid() && ! $file->hasMoved()) {
+            if (! in_array($file->getMimeType(), ['image/jpeg', 'image/png', 'image/webp'], true) || $file->getSize() > 12 * 1024 * 1024) {
+                return $this->back('/reservations', 'Bukti DP harus gambar JPG/PNG/WEBP maksimal 12MB.', 'error')->withInput();
+            }
+            [$proofUrl, $perr] = \App\Libraries\Cloud::upload($file->getTempName(), 'waroeng-mbok-reneo/dp', 1600);
+            if ($perr) return $this->back('/reservations', $perr, 'error')->withInput();
+        }
         $data = [
             'customer_name' => $name, 'phone' => $phone, 'reserved_at' => date('Y-m-d H:i:00', $ts), 'pax' => $pax,
             'table_no' => trim((string) $this->request->getPost('table_no')) ?: null, 'dp_amount' => $dp,
             'note' => trim((string) $this->request->getPost('note')) ?: null, 'remind_minutes' => $rm, 'updated_at' => date('Y-m-d H:i:s'),
         ];
+        if ($proofUrl) $data['dp_proof_url'] = $proofUrl;
         if ($id) {
             $row = $this->db->table('reservations')->where('id', $id)->where('location_id', loc_id())->get()->getRowArray();
             if (! $row) return $this->back('/reservations', 'Reservasi tidak ditemukan.', 'error');
+            if (! empty($row['dp_sale_id'])) $data['dp_amount'] = $row['dp_amount']; // DP sudah dipakai di kasir: nominal dikunci
             if ($row['reserved_at'] !== $data['reserved_at'] || $row['remind_minutes'] != $rm) $data['ack_at'] = null; // jadwal berubah -> ingatkan lagi
             $this->db->table('reservations')->where('id', $id)->update($data);
             $msg = 'Reservasi diperbarui.';

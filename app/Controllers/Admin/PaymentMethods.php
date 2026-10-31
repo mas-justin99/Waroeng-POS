@@ -6,7 +6,7 @@ use App\Controllers\BaseController;
 
 class PaymentMethods extends BaseController
 {
-    public const TYPES = ['cash' => 'Tunai', 'qris' => 'QRIS', 'card' => 'Kartu', 'ewallet' => 'E-Wallet', 'transfer' => 'Transfer', 'online' => 'Platform Online', 'other' => 'Lainnya'];
+    public const TYPES = ['cash' => 'Tunai', 'qris' => 'QRIS', 'card' => 'Kartu', 'ewallet' => 'E-Wallet', 'transfer' => 'Transfer', 'online' => 'Platform Online', 'dp' => 'DP Reservasi', 'other' => 'Lainnya'];
 
     public function index()
     {

@@ -23,6 +23,7 @@
     <div class="d-flex flex-wrap align-items-center gap-2"><b><?= esc($r['customer_name']) ?></b><span class="badge-soft badge-<?= $sc ?>"><?= $sl ?></span>
       <?php if ($active && $left <= 120 && $left >= -60): ?><span class="badge-soft <?= $left < 0 ? 'badge-danger' : 'badge-warning' ?>"><i class="bi bi-alarm"></i> <?= $left < 0 ? 'terlambat ' . abs($left) . ' mnt' : ($left === 0 ? 'sekarang' : $left . ' mnt lagi') ?></span><?php endif; ?></div>
     <div class="text-muted small"><i class="bi bi-people"></i> <?= (int) $r['pax'] ?> orang<?= $r['table_no'] ? ' · Meja ' . esc($r['table_no']) : '' ?><?= $r['phone'] ? ' · ' . esc($r['phone']) : '' ?><?= $r['dp_amount'] > 0 ? ' · DP ' . rupiah($r['dp_amount']) : '' ?></div>
+    <?php if ($r['dp_amount'] > 0): ?><div class="small mt-1 d-flex flex-wrap gap-2 align-items-center"><?php if (! empty($r['dp_sale_id'])): ?><span class="badge-soft badge-success"><i class="bi bi-check2-circle"></i> DP terpakai di kasir</span><?php else: ?><span class="badge-soft badge-info"><i class="bi bi-wallet2"></i> DP siap dipakai di kasir</span><?php endif; ?><?php if (! empty($r['dp_proof_url'])): ?><a href="<?= esc($r['dp_proof_url']) ?>" target="_blank" rel="noopener" class="d-inline-flex align-items-center gap-1"><img class="thumb" style="width:32px;height:32px" src="<?= esc($r['dp_proof_url']) ?>" alt=""> Bukti DP</a><?php elseif (empty($r['dp_sale_id'])): ?><span class="text-muted">belum ada bukti DP</span><?php endif; ?></div><?php endif; ?>
     <?php if ($r['note']): ?><div class="small mt-1"><i class="bi bi-chat-left-text"></i> <?= esc($r['note']) ?></div><?php endif; ?>
   </div>
   <?php if ($canEdit): ?>
@@ -33,7 +34,7 @@
       <form method="post" action="/reservations/<?= $r['id'] ?>/status"><?= csrf_field() ?><input type="hidden" name="status" value="arrived"><input type="hidden" name="back" value="/reservations?v=<?= $view ?>"><button class="btn btn-sm btn-primary"><i class="bi bi-person-check"></i> Datang</button></form>
       <div class="dropdown"><button class="btn btn-sm btn-ghost" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
         <ul class="dropdown-menu dropdown-menu-end">
-          <li><button class="dropdown-item" data-bs-toggle="modal" data-bs-target="#rsvM" data-edit="#rsvM" data-title="Ubah reservasi" data-id="<?= $r['id'] ?>" data-customer_name="<?= esc($r['customer_name'], 'attr') ?>" data-phone="<?= esc((string) $r['phone'], 'attr') ?>" data-reserved_at="<?= date('Y-m-d\TH:i', $ts) ?>" data-pax="<?= (int) $r['pax'] ?>" data-table_no="<?= esc((string) $r['table_no'], 'attr') ?>" data-dp_amount="<?= (int) $r['dp_amount'] ?>" data-note="<?= esc((string) $r['note'], 'attr') ?>" data-remind_minutes="<?= (int) $r['remind_minutes'] ?>"><i class="bi bi-pencil"></i> Ubah</button></li>
+          <li><button class="dropdown-item" data-bs-toggle="modal" data-bs-target="#rsvM" data-edit="#rsvM" data-title="Ubah reservasi" data-id="<?= $r['id'] ?>" data-customer_name="<?= esc($r['customer_name'], 'attr') ?>" data-phone="<?= esc((string) $r['phone'], 'attr') ?>" data-reserved_at="<?= date('Y-m-d\TH:i', $ts) ?>" data-pax="<?= (int) $r['pax'] ?>" data-table_no="<?= esc((string) $r['table_no'], 'attr') ?>" data-dp_amount="<?= (int) $r['dp_amount'] ?>" data-note="<?= esc((string) $r['note'], 'attr') ?>" data-remind_minutes="<?= (int) $r['remind_minutes'] ?>" data-proof="<?= esc((string) ($r['dp_proof_url'] ?? '')) ?>" data-dplocked="<?= ! empty($r['dp_sale_id']) ? 1 : 0 ?>"><i class="bi bi-pencil"></i> Ubah</button></li>
           <?php foreach (['no_show' => ['Tidak datang', 'bi-person-x'], 'cancelled' => ['Batalkan', 'bi-x-circle']] as $k => [$l, $ic]): ?>
           <li><form method="post" action="/reservations/<?= $r['id'] ?>/status" onsubmit="return confirm('<?= $l ?> reservasi ini?')"><?= csrf_field() ?><input type="hidden" name="status" value="<?= $k ?>"><input type="hidden" name="back" value="/reservations?v=<?= $view ?>"><button class="dropdown-item text-danger"><i class="bi <?= $ic ?>"></i> <?= $l ?></button></form></li>
           <?php endforeach; ?>
@@ -46,7 +47,7 @@
 </div>
 
 <?php if ($canEdit): ?>
-<div class="modal fade" id="rsvM" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><form class="modal-content" method="post" action="/reservations/save"><?= csrf_field() ?><input type="hidden" name="id">
+<div class="modal fade" id="rsvM" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><form class="modal-content" method="post" action="/reservations/save" enctype="multipart/form-data"><?= csrf_field() ?><input type="hidden" name="id">
   <div class="modal-header"><h5 class="modal-title">Reservasi baru</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
   <div class="modal-body"><div class="row g-3">
     <div class="col-12"><label class="form-label">Nama pemesan *</label><input name="customer_name" class="form-control" required maxlength="100"></div>
@@ -55,10 +56,28 @@
     <div class="col-6 col-sm-4"><label class="form-label">Jumlah orang *</label><input name="pax" type="number" min="1" max="500" class="form-control" value="2" data-default="2" required></div>
     <div class="col-6 col-sm-4"><label class="form-label">No. meja</label><input name="table_no" class="form-control" maxlength="20" placeholder="mis. 5"></div>
     <div class="col-12 col-sm-4"><label class="form-label">DP (Rp)</label><input name="dp_amount" inputmode="numeric" class="form-control money" value="0" data-default="0"></div>
+    <div class="col-12"><label class="form-label">Bukti / struk DP (foto)</label>
+      <input name="dp_proof" type="file" accept="image/*" class="form-control">
+      <div id="rsvProofBox" class="d-none mt-2 small"><a id="rsvProofLink" target="_blank" rel="noopener" class="d-inline-flex align-items-center gap-2"><img id="rsvProofImg" class="thumb" style="width:44px;height:44px" alt=""> Bukti saat ini (pilih foto baru untuk mengganti)</a></div>
+      <div id="rsvDpLock" class="d-none form-text text-warning">DP sudah dipakai di kasir, nominalnya tidak bisa diubah.</div>
+    </div>
     <div class="col-12"><label class="form-label">Ingatkan</label>
       <select name="remind_minutes" class="form-select" data-default="60"><?php foreach ([0 => 'Tepat waktu', 15 => '15 menit sebelum', 30 => '30 menit sebelum', 60 => '1 jam sebelum', 120 => '2 jam sebelum', 180 => '3 jam sebelum', 1440 => '1 hari sebelum'] as $v => $l): ?><option value="<?= $v ?>" <?= $v === 60 ? 'selected' : '' ?>><?= $l ?></option><?php endforeach; ?></select></div>
     <div class="col-12"><label class="form-label">Catatan</label><input name="note" class="form-control" maxlength="255" placeholder="mis. ulang tahun, minta kursi bayi" data-default=""></div>
   </div></div>
   <div class="modal-footer"><button class="btn btn-primary w-100">Simpan</button></div></form></div></div>
 <?php endif; ?>
+<?= $this->endSection() ?>
+<?= $this->section('scripts') ?>
+<script>
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-edit="#rsvM"],[data-new="#rsvM"]'); if (!b) return;
+  const proof = b.dataset.proof || '', box = document.getElementById('rsvProofBox');
+  box.classList.toggle('d-none', !proof);
+  if (proof) { document.getElementById('rsvProofLink').href = proof; document.getElementById('rsvProofImg').src = proof; }
+  document.getElementById('rsvDpLock').classList.toggle('d-none', b.dataset.dplocked !== '1');
+  document.querySelector('#rsvM [name=dp_amount]').readOnly = b.dataset.dplocked === '1';
+  const f = document.querySelector('#rsvM [name=dp_proof]'); f.value = ''; const h = f.parentNode.querySelector('.img-hint'); if (h) h.remove();
+});
+</script>
 <?= $this->endSection() ?>

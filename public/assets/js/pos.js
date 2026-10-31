@@ -3,7 +3,7 @@
   const P = window.POS, $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
   const state = { cart: {}, cat: 0, q: '', otype: 'dine_in', dtype: 'nominal', dval: 0, pays: [] };
   const byId = Object.fromEntries(P.products.map(p => [p.id, p]));
-  const icon = { cash: 'bi-cash-coin', qris: 'bi-qr-code', card: 'bi-credit-card', ewallet: 'bi-wallet2', transfer: 'bi-bank', online: 'bi-bicycle', other: 'bi-ticket-perforated' };
+  const icon = { cash: 'bi-cash-coin', qris: 'bi-qr-code', card: 'bi-credit-card', ewallet: 'bi-wallet2', transfer: 'bi-bank', online: 'bi-bicycle', dp: 'bi-bookmark-star', other: 'bi-ticket-perforated' };
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const modal = id => bootstrap.Modal.getOrCreateInstance($(id));
 
@@ -109,7 +109,7 @@
       const m = mById[p.method_id];
       return `<div class="payline" data-i="${i}"><div class="nm"><i class="bi ${icon[m.type] || icon.other} text-primary"></i>${esc(m.name)}</div><button class="x" data-a="rm"><i class="bi bi-x-circle-fill"></i></button>
         <input class="form-control" data-a="amt" type="text" inputmode="numeric" value="${p.amount ? Number(p.amount).toLocaleString('id-ID') : ''}" placeholder="0">
-        ${m.type !== 'cash' ? `<input class="form-control" data-a="ref" style="text-align:left;font-weight:500" placeholder="No. ref / approval (opsional)" value="${esc(p.reference || '')}">` : '<span></span>'}</div>`;
+        ${m.type === 'dp' ? `<div class="small text-muted" style="grid-column:1/-1">Reservasi <b>${esc(p.rname || '')}</b> · DP ${rp(p.max || 0)}${p.max > p.amount ? ' · <span class="text-warning">sisa ' + rp(p.max - p.amount) + ' tidak terpotong</span>' : ''}</div>` : m.type !== 'cash' ? `<input class="form-control" data-a="ref" style="text-align:left;font-weight:500" placeholder="No. ref / approval (opsional)" value="${esc(p.reference || '')}">` : '<span></span>'}</div>`;
     }).join('');
     const hasCash = state.pays.some(p => mById[p.method_id].type === 'cash');
     const q = [];
@@ -126,6 +126,7 @@
   });
   $('#pg').addEventListener('click', e => {
     const b = e.target.closest('.pm'); if (!b) return; const id = +b.dataset.id, m = mById[id];
+    if (m.type === 'dp') { openDp(id); return; }
     const rem = Math.max(0, totals().total - paid());
     const ex = state.pays.find(p => p.method_id === id);
     if (ex && m.type !== 'cash') { if (!rem) return; ex.amount = (parseFloat(ex.amount) || 0) + rem; }
@@ -138,8 +139,25 @@
   });
   $('#lines').addEventListener('input', e => {
     const i = +e.target.closest('.payline').dataset.i;
-    if (e.target.dataset.a === 'amt') { const n = parseInt(e.target.value.replace(/\D/g, '')) || 0; state.pays[i].amount = n; e.target.value = n ? n.toLocaleString('id-ID') : ''; updSum(); }
+    if (e.target.dataset.a === 'amt') { let n = parseInt(e.target.value.replace(/\D/g, '')) || 0; if (state.pays[i].max) n = Math.min(n, state.pays[i].max); state.pays[i].amount = n; e.target.value = n ? n.toLocaleString('id-ID') : ''; updSum(); }
     if (e.target.dataset.a === 'ref') state.pays[i].reference = e.target.value;
+  });
+  /* ---------- DP reservasi ---------- */
+  function openDp(methodId) {
+    const taken = state.pays.filter(p => p.reservation_id).map(p => p.reservation_id);
+    const list = (P.dps || []).filter(r => !taken.includes(+r.id));
+    if (!list.length) { Toast.show('Tidak ada reservasi ber-DP yang belum terpakai.', 'err'); return; }
+    $('#dpList').innerHTML = list.map(r => `<button type="button" class="dp-item" data-id="${r.id}"><div><b>${esc(r.name)}</b><div class="small text-muted">${esc(String(r.reserved_at).slice(5, 16).replace('-', '/'))} · ${r.pax} org${r.table_no ? ' · Meja ' + esc(r.table_no) : ''}</div></div><span class="num fw-bold">${rp(+r.amount)}</span></button>`).join('');
+    $('#dpList').dataset.m = methodId; modal('#dpModal').show();
+  }
+  $('#dpList').addEventListener('click', e => {
+    const b = e.target.closest('.dp-item'); if (!b) return;
+    const r = P.dps.find(x => x.id == b.dataset.id), mid = +$('#dpList').dataset.m;
+    if (state.pays.length === 1 && mById[state.pays[0].method_id].type === 'cash' && parseFloat(state.pays[0].amount) === totals().total) state.pays = [];
+    const rem = Math.max(0, totals().total - paid());
+    state.pays.push({ method_id: mid, amount: Math.min(+r.amount, rem), max: +r.amount, reservation_id: +r.id, rname: r.name, reference: '' });
+    modal('#dpModal').hide(); renderPay();
+    const left = Math.max(0, totals().total - paid()); if (left > 0) Toast.show('DP dipotong. Sisa tagihan ' + rp(left) + ' — pilih metode lain.', 'ok');
   });
   function updSum() { // update ringkasan tanpa render ulang (menjaga fokus input)
     const t = totals(), pd = paid(), rem = t.total - pd;
@@ -155,7 +173,7 @@
     try {
       const r = await api('/pos/checkout', {
         items: Object.entries(state.cart).map(([id, qty]) => ({ id: +id, qty })), order_type: state.otype, table_no: $('#table').value, customer: $('#cust').value,
-        discount_type: state.dtype, discount_value: state.dval, payments: state.pays.map(p => ({ method_id: p.method_id, amount: +p.amount, reference: p.reference }))
+        discount_type: state.dtype, discount_value: state.dval, payments: state.pays.map(p => ({ method_id: p.method_id, amount: +p.amount, reference: p.reference, reservation_id: p.reservation_id || null }))
       });
       // kurangi stok lokal
       for (const [id, q] of Object.entries(state.cart)) byId[id].stock -= q;
