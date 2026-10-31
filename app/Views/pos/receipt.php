@@ -1,13 +1,13 @@
 <?php helper('app'); ?>
 <!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title><?= esc($sale['invoice_no']) ?></title>
-<link href="<?= base_url('assets/css/app.css') ?>" rel="stylesheet">
+<link href="<?= base_url('assets/css/app.css') ?>?v=5" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 </head><body style="background:#eee">
 <div class="receipt">
   <div class="c">
     <img src="<?= base_url('assets/img/logo.png') ?>" onerror="this.onerror=null;this.src='<?= base_url('assets/img/logo.svg') ?>'" alt="">
-    <b style="font-size:14px">WAROENG MBOK RENEO</b><br><?= esc($loc['name'] ?? '') ?><br>
+    <b style="font-size:13px">WAROENG MBOK RENEO</b><br><?= esc($loc['name'] ?? '') ?><br>
     <?php if (! empty($loc['address'])): ?><?= esc($loc['address']) ?><br><?php endif; ?>
     <?php if (! empty($loc['phone'])): ?>Telp. <?= esc($loc['phone']) ?><br><?php endif; ?>
   </div>
@@ -27,7 +27,7 @@
   <?php if ($sale['discount'] > 0): ?><div class="r"><span>Diskon</span><span>-<?= rupiah($sale['discount'], false) ?></span></div><?php endif; ?>
   <?php if ($sale['service'] > 0): ?><div class="r"><span>Service</span><span><?= rupiah($sale['service'], false) ?></span></div><?php endif; ?>
   <?php if ($sale['tax'] > 0): ?><div class="r"><span>Pajak</span><span><?= rupiah($sale['tax'], false) ?></span></div><?php endif; ?>
-  <div class="r" style="font-weight:700;font-size:14px"><span>TOTAL</span><span><?= rupiah($sale['total'], false) ?></span></div>
+  <div class="r" style="font-weight:700;font-size:13px"><span>TOTAL</span><span><?= rupiah($sale['total'], false) ?></span></div>
   <hr>
   <?php foreach ($pays as $p): ?><div class="r"><span><?= esc($p['method_name']) ?></span><span><?= rupiah($p['amount'], false) ?></span></div><?php endforeach; ?>
   <?php if ($sale['change_amount'] > 0): ?><div class="r"><span>Kembalian</span><span><?= rupiah($sale['change_amount'], false) ?></span></div><?php endif; ?>

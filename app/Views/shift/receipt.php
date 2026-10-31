@@ -3,13 +3,13 @@ $cashCount = $open ? null : (float) $shift['closing_cash']; $exp = $open ? $sum[
 $left = array_values(array_filter($stock, fn ($r) => $r['end'] > 0)); $empty = array_values(array_filter($stock, fn ($r) => $r['end'] <= 0)); ?>
 <!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Penutupan <?= esc(ShiftService::LABELS[$shift['shift_no']]) ?> <?= esc($shift['shift_date']) ?></title>
-<link href="<?= base_url('assets/css/app.css') ?>" rel="stylesheet">
+<link href="<?= base_url('assets/css/app.css') ?>?v=5" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 </head><body style="background:#eee">
 <div class="receipt">
   <div class="c">
     <img src="<?= base_url('assets/img/logo.png') ?>" onerror="this.onerror=null;this.src='<?= base_url('assets/img/logo.svg') ?>'" alt="">
-    <b style="font-size:14px">WAROENG MBOK RENEO</b><br><?= esc($loc['name'] ?? '') ?><br>
+    <b style="font-size:13px">WAROENG MBOK RENEO</b><br><?= esc($loc['name'] ?? '') ?><br>
     <b>STRUK PENUTUPAN KASIR</b><?php if ($open): ?><br>** PRATINJAU - SHIFT BELUM DITUTUP **<?php endif; ?>
   </div>
   <hr>
@@ -25,7 +25,7 @@ $left = array_values(array_filter($stock, fn ($r) => $r['end'] > 0)); $empty = a
   <?php if ($sum['discount'] > 0): ?><div class="r"><span>Diskon</span><span>-<?= rupiah($sum['discount'], false) ?></span></div><?php endif; ?>
   <?php if ($sum['service'] > 0): ?><div class="r"><span>Service</span><span><?= rupiah($sum['service'], false) ?></span></div><?php endif; ?>
   <?php if ($sum['tax'] > 0): ?><div class="r"><span>Pajak</span><span><?= rupiah($sum['tax'], false) ?></span></div><?php endif; ?>
-  <div class="r" style="font-weight:700;font-size:14px"><span>OMSET</span><span><?= rupiah($sum['total'], false) ?></span></div>
+  <div class="r" style="font-weight:700;font-size:13px"><span>OMSET</span><span><?= rupiah($sum['total'], false) ?></span></div>
   <?php if ($sum['void_count']): ?><div class="r"><span>Void (<?= $sum['void_count'] ?>)</span><span><?= rupiah($sum['void_total'], false) ?></span></div><?php endif; ?>
   <hr>
   <div class="c"><b>METODE PEMBAYARAN</b></div>
