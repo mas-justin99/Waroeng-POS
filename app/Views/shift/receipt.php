@@ -3,7 +3,7 @@ $cashCount = $open ? null : (float) $shift['closing_cash']; $exp = $open ? $sum[
 $left = array_values(array_filter($stock, fn ($r) => $r['end'] > 0)); $empty = array_values(array_filter($stock, fn ($r) => $r['end'] <= 0)); ?>
 <!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Penutupan <?= esc(ShiftService::LABELS[$shift['shift_no']]) ?> <?= esc($shift['shift_date']) ?></title>
-<link href="<?= base_url('assets/css/app.css') ?>?v=5" rel="stylesheet">
+<link href="<?= base_url('assets/css/app.css') ?>?v=6" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 </head><body style="background:#eee">
 <div class="receipt">
@@ -58,7 +58,6 @@ $left = array_values(array_filter($stock, fn ($r) => $r['end'] > 0)); $empty = a
   <div class="r" style="margin-top:22px"><span class="c" style="flex:1;border-top:1px solid #000;padding-top:3px">Kasir</span><span style="width:16px"></span><span class="c" style="flex:1;border-top:1px solid #000;padding-top:3px">Pemilik/Manajer</span></div>
   <div class="c" style="margin-top:8px">Dicetak <?= date('d/m/Y H:i') ?></div>
 </div>
-<div class="no-print text-center pb-4"><button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> Cetak Struk</button>
-  <a class="btn btn-ghost" href="/shifts/<?= $shift['id'] ?>">Rekap Lengkap</a> <a class="btn btn-ghost" href="/shift">Selesai</a></div>
+<?= view('partials/printbar', ['extra' => '<a class="btn btn-sm btn-ghost" href="/shifts/' . $shift['id'] . '">Rekap Lengkap</a> <a class="btn btn-sm btn-ghost" href="/shift">Selesai</a>']) ?>
 <?php if (service('request')->getGet('print')): ?><script>window.addEventListener('load',()=>setTimeout(()=>window.print(),400))</script><?php endif; ?>
 </body></html>

@@ -3,6 +3,7 @@
 <?= $this->section('content') ?>
 <div class="page-head anim"><div><a href="/shift" class="small"><i class="bi bi-arrow-left"></i> Kembali</a><h2>Tutup <?= esc(ShiftService::LABELS[$shift['shift_no']]) ?></h2>
 <div class="text-muted">Dibuka <?= tgl($shift['opened_at']) ?> oleh <?= esc($shift['opener']) ?></div></div></div>
+<?php if (! empty($openBills)): ?><div class="alert alert-warning anim"><i class="bi bi-receipt-cutoff"></i> Masih ada <b><?= (int) $openBills ?> bill meja</b> yang belum dibayar. Bill tidak ikut tertutup dan tetap bisa dibayar di shift berikutnya, tetapi cek dulu apakah ada pelanggan yang sudah pulang. <a href="/bills">Lihat bill meja</a></div><?php endif; ?>
 <form method="post" action="/shift/close" class="row g-3">
   <?= csrf_field() ?>
   <div class="col-lg-6 anim"><div class="card-x card-b">

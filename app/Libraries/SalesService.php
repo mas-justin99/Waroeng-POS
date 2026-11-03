@@ -108,6 +108,14 @@ class SalesService
             }
             $db->table('sales')->where('id', $saleId)->update(['cogs' => round($cogs, 2)]);
 
+            // Bill meja yang dibayar ditutup & ditautkan ke penjualan ini
+            $billId = (int) ($in['bill_id'] ?? 0);
+            if ($billId) {
+                $bill = $db->query("SELECT id FROM table_bills WHERE id = ? AND location_id = ? AND status = 'open' FOR UPDATE", [$billId, $locId])->getRowArray();
+                if (! $bill) throw new RuntimeException('Bill meja sudah ditutup (mungkin sudah dibayar atau dibatalkan). Muat ulang halaman kasir.');
+                $db->table('table_bills')->where('id', $billId)->update(['status' => 'paid', 'sale_id' => $saleId, 'closed_at' => $now, 'updated_at' => $now]);
+            }
+
             // Kembalian dipotong dari baris tunai agar sum(pembayaran) = total
             $rem = $change;
             foreach ($pays as $p) {

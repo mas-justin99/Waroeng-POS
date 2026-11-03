@@ -23,7 +23,17 @@ class Pos extends BaseController
             $p['category_id'] = (int) $p['category_id'];
         }
         $l = loc_row();
+        $preBill = null;
+        if ($bid = (int) $this->request->getGet('bill')) {
+            $b = $this->db->table('table_bills')->where('id', $bid)->where('location_id', $loc)->where('status', 'open')->get()->getRowArray();
+            if ($b) {
+                $lines = \App\Libraries\BillService::lines($bid);
+                $preBill = ['id' => $bid, 'table_no' => $b['table_no'], 'customer' => $b['customer_name'], 'order_type' => $b['order_type'],
+                    'discount_type' => $b['discount_type'], 'discount_value' => (float) $b['discount_value'], 'lines' => $lines];
+            }
+        }
         return view('pos/index', [
+            'preBill' => $preBill,
             'shift' => $shift,
             'products' => $products,
             'categories' => $this->db->table('categories')->orderBy('name')->get()->getResultArray(),

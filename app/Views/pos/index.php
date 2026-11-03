@@ -18,10 +18,12 @@
       <div class="d-flex align-items-center justify-content-between mb-2">
         <b style="font-size:1.05rem"><i class="bi bi-bag-heart text-primary"></i> Pesanan</b>
         <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-ghost" id="billsBtn"><i class="bi bi-receipt-cutoff"></i> Meja <span class="badge-soft badge-primary d-none" id="billsCnt">0</span></button>
           <button class="btn btn-sm btn-ghost" id="clear"><i class="bi bi-trash3"></i></button>
           <button class="btn btn-sm btn-ghost cart-close" id="closeCart"><i class="bi bi-x-lg"></i></button>
         </div>
       </div>
+      <div class="cart-bill d-none" id="billTag"><span><i class="bi bi-receipt-cutoff"></i> <span id="billTagTxt"></span></span><button id="billDetach" title="Lepas dari bill"><i class="bi bi-x-lg"></i></button></div>
       <div class="seg w-100 mb-2" id="otype">
         <button class="on flex-fill justify-content-center" data-v="dine_in"><i class="bi bi-cup-hot"></i> Makan</button>
         <button class="flex-fill justify-content-center" data-v="take_away"><i class="bi bi-bag"></i> Bawa</button>
@@ -36,13 +38,19 @@
       <div class="sum-r" id="r-svc"><span>Service (<?= rtrim(rtrim(number_format($service, 2), '0'), '.') ?>%)</span><span class="num" id="s-svc">Rp 0</span></div>
       <div class="sum-r" id="r-tax"><span>Pajak (<?= rtrim(rtrim(number_format($tax, 2), '0'), '.') ?>%)</span><span class="num" id="s-tax">Rp 0</span></div>
       <div class="sum-r t"><span>Total</span><span class="num" id="s-total">Rp 0</span></div>
-      <button class="btn btn-primary btn-lg w-100 mt-3" id="payBtn" disabled><i class="bi bi-wallet2"></i> Bayar</button>
+      <div class="d-flex gap-2 mt-3"><button class="btn btn-ghost flex-fill" id="saveBill" disabled><i class="bi bi-journal-plus"></i> Simpan ke Meja</button><button class="btn btn-ghost flex-fill" id="printBill" disabled><i class="bi bi-printer"></i> Cetak Bill</button></div>
+      <button class="btn btn-primary btn-lg w-100 mt-2" id="payBtn" disabled><i class="bi bi-wallet2"></i> Bayar</button>
     </div>
   </aside>
   <div class="scrim" id="scrim"></div>
   <button class="cart-bar" id="cartBar"><span><span class="c" id="barQty">0</span>Lihat pesanan</span><span class="num" id="barTotal">Rp 0</span></button>
 </div>
 
+<!-- Bill meja terbuka -->
+<div class="modal fade" id="billsModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title">Bill Meja Terbuka</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body"><div class="small text-muted mb-2">Pilih meja untuk menambah pesanan atau membayar.</div><div id="billsList" class="d-grid gap-2"></div></div>
+</div></div></div>
 <!-- Diskon -->
 <div class="modal fade" id="discModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-sm"><div class="modal-content">
   <div class="modal-header"><h5 class="modal-title">Diskon</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
@@ -100,10 +108,11 @@
 <script>
 window.POS = {
   products: <?= json_encode($products, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>,
+  bill: <?= json_encode($preBill ?? null, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>,
   dps: <?= json_encode($dps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>,
   methods: <?= json_encode($methods, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>,
   tax: <?= $tax ?>, service: <?= $service ?>
 };
 </script>
-<script src="<?= base_url('assets/js/pos.js') ?>?v=3"></script>
+<script src="<?= base_url('assets/js/pos.js') ?>?v=5"></script>
 <?= $this->endSection() ?>

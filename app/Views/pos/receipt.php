@@ -1,7 +1,7 @@
 <?php helper('app'); ?>
 <!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title><?= esc($sale['invoice_no']) ?></title>
-<link href="<?= base_url('assets/css/app.css') ?>?v=5" rel="stylesheet">
+<link href="<?= base_url('assets/css/app.css') ?>?v=6" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 </head><body style="background:#eee">
 <div class="receipt">
@@ -35,6 +35,6 @@
   <hr>
   <div class="c"><?= esc($loc['receipt_footer'] ?? 'Terima kasih') ?></div>
 </div>
-<div class="no-print text-center pb-4"><button class="btn btn-primary" onclick="window.print()"><i class="bi bi-printer"></i> Cetak</button> <a class="btn btn-ghost" href="javascript:window.close()">Tutup</a></div>
+<?= view('partials/printbar', ['extra' => '<a class="btn btn-sm btn-ghost" href="javascript:window.close()">Tutup</a>']) ?>
 <?php if (service('request')->getGet('print')): ?><script>window.addEventListener('load',()=>setTimeout(()=>window.print(),400))</script><?php endif; ?>
 </body></html>

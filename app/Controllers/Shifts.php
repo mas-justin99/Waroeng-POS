@@ -88,7 +88,8 @@ class Shifts extends BaseController
     {
         $shift = $this->mine();
         if (! $shift) return $this->back('/shift', 'Tidak ada shift yang sedang dibuka.', 'error');
-        return view('shift/close', ['shift' => $shift, 'sum' => ShiftService::summary($shift)]);
+        return view('shift/close', ['shift' => $shift, 'sum' => ShiftService::summary($shift),
+            'openBills' => $this->db->table('table_bills')->where('location_id', $shift['location_id'])->where('status', 'open')->countAllResults()]);
     }
 
     public function close()
@@ -142,7 +143,7 @@ class Shifts extends BaseController
         return view('shift/show', ['shift' => $shift, 'sum' => ShiftService::summary($shift), 'stock' => ShiftService::stockReport($shift), 'sales' => $sales]);
     }
 
-    /** Struk penutupan shift (80 mm). Shift yang masih buka tampil sebagai pratinjau. */
+    /** Struk penutupan shift (58 mm). Shift yang masih buka tampil sebagai pratinjau. */
     public function receipt(int $id)
     {
         $shift = $this->db->table('cash_shifts c')->select('c.*, u.name AS opener, cu.name AS closer')

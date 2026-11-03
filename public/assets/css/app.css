@@ -248,3 +248,17 @@ a{color:var(--primary);text-decoration:none} a:hover{color:var(--primary-600)}
 /* ---- Pilih DP reservasi di kasir */
 .dp-item{display:flex;justify-content:space-between;align-items:center;gap:12px;text-align:left;width:100%;background:#fff;border:1px solid var(--bs-border-color,#e5e1dc);border-radius:12px;padding:10px 12px}
 .dp-item:active,.dp-item:hover{border-color:var(--primary);background:var(--primary-soft,#fdecee)}
+
+/* ---- Tombol cetak struk */
+.pbar{max-width:420px;margin:0 auto 24px;padding:0 12px;display:grid;gap:8px}
+.pbar-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;align-items:center}
+.pbar-help summary{cursor:pointer;text-align:center}.pbar-help div{margin-top:6px;text-align:left}
+
+/* ---- Bill per meja */
+.bill-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,290px),1fr));gap:12px}
+.bill{display:grid;gap:10px}.bill-tbl{font-size:1.25rem;font-weight:800;color:var(--primary)}
+.bill-items{list-style:none;margin:0;padding:8px 0;border-top:1px dashed #d8d2cb;border-bottom:1px dashed #d8d2cb;font-size:.85rem}
+.bill-items li{display:flex;justify-content:space-between;gap:8px}.bill-items li span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cart-bill{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--primary-soft,#fdecee);color:var(--primary);border-radius:10px;padding:6px 10px;font-weight:600;font-size:.85rem;margin-bottom:8px}
+.cart-bill button{background:none;border:0;color:inherit;padding:0 2px}
+.dp-item .bd{font-size:.75rem}

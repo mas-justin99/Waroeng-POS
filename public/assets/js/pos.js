@@ -1,7 +1,7 @@
 /* Logika kasir: keranjang, diskon, split payment, checkout */
 (function () {
   const P = window.POS, $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
-  const state = { cart: {}, cat: 0, q: '', otype: 'dine_in', dtype: 'nominal', dval: 0, pays: [] };
+  const state = { bill: null, cart: {}, cat: 0, q: '', otype: 'dine_in', dtype: 'nominal', dval: 0, pays: [] };
   const byId = Object.fromEntries(P.products.map(p => [p.id, p]));
   const icon = { cash: 'bi-cash-coin', qris: 'bi-qr-code', card: 'bi-credit-card', ewallet: 'bi-wallet2', transfer: 'bi-bank', online: 'bi-bicycle', dp: 'bi-bookmark-star', other: 'bi-ticket-perforated' };
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -49,7 +49,7 @@
     tween($('#s-sub'), t.sub); tween($('#s-total'), t.total); tween($('#barTotal'), t.total);
     $('#s-disc').textContent = '- ' + rp(t.disc); $('#s-svc').textContent = rp(t.svc); $('#s-tax').textContent = rp(t.tax);
     $('#r-svc').style.display = P.service ? '' : 'none'; $('#r-tax').style.display = P.tax ? '' : 'none';
-    $('#barQty').textContent = t.qty; $('#payBtn').disabled = !t.qty; $('#cartBar').style.display = '';
+    $('#barQty').textContent = t.qty; $('#payBtn').disabled = !t.qty; $('#saveBill').disabled = !t.qty; $('#printBill').disabled = !t.qty; $('#cartBar').style.display = '';
     renderGrid();
     if (pulseId && window.gsap) {
       const el = $(`.ci[data-id="${pulseId}"]`); if (el) gsap.fromTo(el, { backgroundColor: '#FDECEC' }, { backgroundColor: 'rgba(253,237,228,0)', duration: .8 });
@@ -80,7 +80,7 @@
   $('#clear').addEventListener('click', async () => {
     if (!Object.keys(state.cart).length) return;
     const r = window.Swal ? await Swal.fire({ title: 'Kosongkan pesanan?', icon: 'warning', showCancelButton: true, confirmButtonText: 'Ya, kosongkan', cancelButtonText: 'Batal', confirmButtonColor: '#E32F37', reverseButtons: true }) : { isConfirmed: confirm('Kosongkan pesanan?') };
-    if (r.isConfirmed) { state.cart = {}; renderCart(); }
+    if (r.isConfirmed) { state.cart = {}; state.bill = null; billTag(); renderCart(); }
   });
 
   /* ---------- bottom sheet (HP/tablet portrait) ---------- */
@@ -88,6 +88,69 @@
   const openCart = o => { cart.classList.toggle('open', o); scrim.classList.toggle('on', o); };
   $('#cartBar').addEventListener('click', () => openCart(true));
   $('#closeCart').addEventListener('click', () => openCart(false)); scrim.addEventListener('click', () => openCart(false));
+
+
+  /* ---------- bill per meja ---------- */
+  const getj = async url => { const r = await fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' } }); const j = await r.json().catch(() => ({ ok: false, message: 'Respon server tidak valid' })); if (!r.ok || j.ok === false) throw new Error(j.message || 'Terjadi kesalahan'); return j; };
+  function billTag() {
+    $('#billTag').classList.toggle('d-none', !state.bill);
+    if (state.bill) $('#billTagTxt').textContent = 'Bill Meja ' + state.bill.table_no + ' (terbuka)';
+  }
+  async function billCount() { try { const j = await getj('/bills/list'); const n = j.bills.length; $('#billsCnt').textContent = n; $('#billsCnt').classList.toggle('d-none', !n); return j.bills; } catch (e) { return []; } }
+  function loadBill(b) {
+    state.cart = {}; const warn = [];
+    for (const l of b.lines) {
+      const p = byId[l.id]; if (!p) { warn.push(l.name); continue; }
+      state.cart[l.id] = Math.min(l.qty, Math.max(p.stock, 0)); if (state.cart[l.id] < l.qty) warn.push(`${p.name} (stok ${p.stock})`); if (state.cart[l.id] <= 0) delete state.cart[l.id];
+    }
+    state.bill = { id: b.id, table_no: b.table_no }; $('#table').value = b.table_no; $('#cust').value = b.customer || '';
+    state.otype = b.order_type || 'dine_in'; $$('#otype button').forEach(x => x.classList.toggle('on', x.dataset.v === state.otype));
+    state.dtype = b.discount_type || 'nominal'; state.dval = +b.discount_value || 0; $$('#dtype button').forEach(x => x.classList.toggle('on', x.dataset.v === state.dtype));
+    billTag(); renderCart();
+    if (warn.length) Toast.show('Sebagian pesanan disesuaikan dengan stok: ' + warn.join(', '), 'err');
+  }
+  const billPayload = () => ({ id: state.bill ? state.bill.id : null, table_no: $('#table').value, customer: $('#cust').value, order_type: state.otype,
+    discount_type: state.dtype, discount_value: state.dval, items: Object.entries(state.cart).map(([id, qty]) => ({ id: +id, qty })) });
+  async function saveBill() {
+    if (!$('#table').value.trim()) { Toast.show('Isi nomor meja dulu.', 'err'); $('#table').focus(); openCart(true); return null; }
+    const r = await api('/bills/save', billPayload());
+    return r;
+  }
+  $('#saveBill').addEventListener('click', async () => {
+    const b = $('#saveBill'); b.disabled = true;
+    try {
+      const r = await saveBill(); if (!r) return;
+      Toast.show(r.merged ? `Pesanan ditambahkan ke bill meja ${r.table_no}.` : `Bill meja ${r.table_no} disimpan.`);
+      state.cart = {}; state.bill = null; state.dval = 0; $('#table').value = ''; $('#cust').value = ''; billTag(); renderCart(); billCount(); openCart(false);
+    } catch (err) { Toast.show(err.message, 'err'); }
+    b.disabled = !Object.keys(state.cart).length;
+  });
+  $('#printBill').addEventListener('click', async () => {
+    const b = $('#printBill'); b.disabled = true;
+    try {
+      const r = await saveBill(); if (!r) return;
+      const j = await getj('/bills/' + r.id); loadBill(j.bill); billCount(); // sinkronkan (bila digabung dengan bill meja yang sama)
+      window.open('/bills/' + r.id + '/print', '_blank');
+    } catch (err) { Toast.show(err.message, 'err'); }
+    b.disabled = !Object.keys(state.cart).length;
+  });
+  $('#billDetach').addEventListener('click', () => { state.bill = null; billTag(); });
+  $('#billsBtn').addEventListener('click', async () => {
+    const list = await billCount();
+    $('#billsList').innerHTML = list.length ? list.map(b => `<button type="button" class="dp-item" data-id="${b.id}"><div><b>Meja ${esc(b.table_no)}</b><div class="small text-muted">${b.customer ? esc(b.customer) + ' · ' : ''}${esc(String(b.opened_at).slice(11, 16))} · ${b.qty} item</div></div><span class="num fw-bold">${rp(b.total)}</span></button>`).join('')
+      : '<div class="empty"><i class="bi bi-receipt-cutoff"></i>Belum ada bill meja yang terbuka.</div>';
+    modal('#billsModal').show();
+  });
+  $('#billsList').addEventListener('click', async e => {
+    const b = e.target.closest('.dp-item'); if (!b) return;
+    if (Object.keys(state.cart).length && !(state.bill && state.bill.id == b.dataset.id)) {
+      const ok = window.Swal ? (await Swal.fire({ title: 'Ganti pesanan di layar?', text: 'Pesanan yang belum disimpan akan diganti dengan bill meja ini.', icon: 'question', showCancelButton: true, confirmButtonText: 'Ya, buka bill', cancelButtonText: 'Batal', confirmButtonColor: '#E32F37', reverseButtons: true })).isConfirmed : confirm('Ganti pesanan di layar dengan bill ini?');
+      if (!ok) return;
+    }
+    try { const j = await getj('/bills/' + b.dataset.id); modal('#billsModal').hide(); loadBill(j.bill); openCart(true); } catch (err) { Toast.show(err.message, 'err'); }
+  });
+  if (P.bill) loadBill(P.bill);
+  billCount();
 
   /* ---------- diskon ---------- */
   $('#discBtn').addEventListener('click', e => { e.preventDefault(); $('#dval').value = state.dval || ''; modal('#discModal').show(); });
@@ -173,12 +236,12 @@
     try {
       const r = await api('/pos/checkout', {
         items: Object.entries(state.cart).map(([id, qty]) => ({ id: +id, qty })), order_type: state.otype, table_no: $('#table').value, customer: $('#cust').value,
-        discount_type: state.dtype, discount_value: state.dval, payments: state.pays.map(p => ({ method_id: p.method_id, amount: +p.amount, reference: p.reference, reservation_id: p.reservation_id || null }))
+        discount_type: state.dtype, discount_value: state.dval, bill_id: state.bill ? state.bill.id : null, payments: state.pays.map(p => ({ method_id: p.method_id, amount: +p.amount, reference: p.reference, reservation_id: p.reservation_id || null }))
       });
       // kurangi stok lokal
       for (const [id, q] of Object.entries(state.cart)) byId[id].stock -= q;
       modal('#payModal').hide();
-      $('#ok-inv').textContent = r.invoice_no; $('#ok-change').textContent = rp(r.change); $('#ok-print').href = '/pos/receipt/' + r.id + '?print=1';
+      $('#ok-inv').textContent = r.invoice_no; $('#ok-change').textContent = rp(r.change); $('#ok-print').href = '/pos/receipt/' + r.id; state.bill = null; billTag();
       openCart(false); modal('#okModal').show();
       if (window.gsap) { gsap.to('.ok-ring circle', { strokeDashoffset: 0, duration: .7, ease: 'power2.out' }); gsap.to('.ok-ring path', { strokeDashoffset: 0, duration: .5, delay: .55, ease: 'power2.out' }); }
       else $$('.ok-ring circle,.ok-ring path').forEach(el => el.style.strokeDashoffset = 0);
@@ -186,7 +249,7 @@
     finally { btn.innerHTML = '<i class="bi bi-check2-circle"></i> Selesaikan Transaksi'; updSum(); }
   });
   $('#ok-new').addEventListener('click', () => {
-    state.cart = {}; state.dval = 0; state.pays = []; $('#table').value = ''; $('#cust').value = '';
+    state.cart = {}; state.dval = 0; state.pays = []; state.bill = null; billTag(); billCount(); $('#table').value = ''; $('#cust').value = '';
     if (window.gsap) gsap.set('.ok-ring circle,.ok-ring path', { strokeDashoffset: (i, el) => el.tagName === 'circle' ? 283 : 60 });
     else $$('.ok-ring circle,.ok-ring path').forEach(el => el.style.strokeDashoffset = el.tagName === 'circle' ? 283 : 60);
     modal('#okModal').hide(); renderCart();

@@ -3,6 +3,7 @@ $u = auth_user();
 $menu = [
   ['Penjualan', [
     ['/pos', 'bi-shop', 'Kasir (POS)', ['cashier'], 'Kasir'],
+    ['/bills', 'bi-receipt-cutoff', 'Bill Meja', ['cashier'], 'Bill'],
     ['/shift', 'bi-unlock', 'Buka / Tutup Kasir', ['cashier'], 'Shift'],
     ['/reservations', 'bi-calendar-check', 'Reservasi', ['cashier', 'kitchen', 'admin'], 'Reservasi'],
     ['/sales', 'bi-receipt', 'Riwayat Penjualan', ['cashier'], 'Riwayat'],

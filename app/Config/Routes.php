@@ -20,6 +20,12 @@ $routes->group('', ['filter' => 'auth'], static function ($r) {
         $r->get('pos', 'Pos::index');
         $r->post('pos/checkout', 'Pos::checkout');
         $r->get('pos/receipt/(:num)', 'Pos::receipt/$1');
+        $r->get('bills', 'Bills::index');
+        $r->get('bills/list', 'Bills::list');
+        $r->get('bills/(:num)', 'Bills::show/$1');
+        $r->get('bills/(:num)/print', 'Bills::print/$1');
+        $r->post('bills/save', 'Bills::save');
+        $r->post('bills/(:num)/cancel', 'Bills::cancel/$1');
         $r->post('reservations/save', 'Reservations::save');
         $r->post('reservations/(:num)/status', 'Reservations::setStatus/$1');
         $r->get('shift', 'Shifts::index');
