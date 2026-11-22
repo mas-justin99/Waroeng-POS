@@ -6,10 +6,34 @@ class ShiftService
 {
     public const LABELS = [1 => 'Shift 1 (Pagi)', 2 => 'Shift 2 (Sore)'];
 
-    /** Shift yang sedang dibuka di sebuah lokasi (maks. satu). */
-    public static function current(int $locId): ?array
+    /** Nama shift + kasir, mis. "Shift 1 (Pagi) · Kasir 2". */
+    public static function label(array $shift): string
     {
-        return db_connect()->table('cash_shifts')->where('location_id', $locId)->where('status', 'open')->get()->getRowArray() ?: null;
+        return (self::LABELS[(int) $shift['shift_no']] ?? 'Shift') . ' · Kasir ' . (int) ($shift['register_no'] ?? 1);
+    }
+
+    /**
+     * Shift terbuka milik seorang kasir di sebuah lokasi. Tanpa $userId (admin): shift terbuka dengan nomor kasir terkecil.
+     * Satu outlet boleh punya beberapa shift terbuka sekaligus (satu per kasir/register).
+     */
+    public static function current(int $locId, ?int $userId = null): ?array
+    {
+        $b = db_connect()->table('cash_shifts')->where('location_id', $locId)->where('status', 'open');
+        if ($userId) $b->where('cashier_id', $userId);
+        return $b->orderBy('register_no')->orderBy('id')->get(1)->getRowArray() ?: null;
+    }
+
+    /** Shift yang dipakai pengguna saat ini: kasir -> miliknya sendiri; admin -> kasir pertama yang terbuka. */
+    public static function forUser(int $locId, array $user): ?array
+    {
+        return self::current($locId, $user['role'] === 'admin' ? null : (int) $user['id']);
+    }
+
+    /** Semua shift terbuka di lokasi, lengkap dengan nama kasir. */
+    public static function openList(int $locId): array
+    {
+        return db_connect()->query("SELECT c.*, u.name AS opener FROM cash_shifts c LEFT JOIN users u ON u.id = c.cashier_id
+                                    WHERE c.location_id = ? AND c.status = 'open' ORDER BY c.register_no, c.id", [$locId])->getResultArray();
     }
 
     /** Ringkasan penjualan & kas sebuah shift. */
@@ -55,10 +79,13 @@ class ShiftService
                           GROUP BY product_id, type", [$shift['location_id'], $shift['opened_at'], $to, $shift['id']])->getResultArray();
         $m = [];
         foreach ($mv as $r) $m[$r['product_id']][$r['type']] = (int) $r['q'];
+        // terjual per kasir/shift: dihitung dari transaksi shift ini (stok outlet dipakai bersama beberapa kasir)
+        $soldBy = array_column($db->query("SELECT i.product_id, SUM(i.qty) AS q FROM sale_items i JOIN sales s ON s.id = i.sale_id
+                                           WHERE s.shift_id = ? AND s.status = 'paid' GROUP BY i.product_id", [$shift['id']])->getResultArray(), 'q', 'product_id');
         foreach ($rows as &$r) {
             $x = $m[$r['product_id']] ?? [];
             $r['in']     = $x['receipt'] ?? 0;
-            $r['sold']   = -(($x['sale'] ?? 0) + ($x['void'] ?? 0));
+            $r['sold']   = (int) ($soldBy[$r['product_id']] ?? 0);
             $r['adjust'] = $x['adjust'] ?? 0;
             $r['end']    = $shift['status'] === 'closed' && $r['closing_qty'] !== null ? (int) $r['closing_qty'] : (int) $r['now_qty'];
             $r['diff_open'] = (int) $r['opening_qty'] - (int) $r['system_qty'];

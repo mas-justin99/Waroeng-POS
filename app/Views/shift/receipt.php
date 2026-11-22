@@ -2,7 +2,7 @@
 $cashCount = $open ? null : (float) $shift['closing_cash']; $exp = $open ? $sum['expected_cash'] : (float) $shift['expected_cash']; $diff = $open ? null : (float) $shift['cash_diff'];
 $left = array_values(array_filter($stock, fn ($r) => $r['end'] > 0)); $empty = array_values(array_filter($stock, fn ($r) => $r['end'] <= 0)); ?>
 <!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Penutupan <?= esc(ShiftService::LABELS[$shift['shift_no']]) ?> <?= esc($shift['shift_date']) ?></title>
+<title>Penutupan <?= esc(ShiftService::label($shift)) ?> <?= esc($shift['shift_date']) ?></title>
 <link href="<?= base_url('assets/css/app.css') ?>?v=6" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 </head><body style="background:#eee">
@@ -13,7 +13,7 @@ $left = array_values(array_filter($stock, fn ($r) => $r['end'] > 0)); $empty = a
     <b>STRUK PENUTUPAN KASIR</b><?php if ($open): ?><br>** PRATINJAU - SHIFT BELUM DITUTUP **<?php endif; ?>
   </div>
   <hr>
-  <div class="r"><span>Shift</span><span><?= esc(ShiftService::LABELS[$shift['shift_no']]) ?></span></div>
+  <div class="r"><span>Shift</span><span><?= esc(ShiftService::label($shift)) ?></span></div>
   <div class="r"><span>Tanggal</span><span><?= tgl($shift['shift_date'], 'd/m/Y') ?></span></div>
   <div class="r"><span>Dibuka</span><span><?= tgl($shift['opened_at'], 'H:i') ?> <?= esc($shift['opener'] ?? '') ?></span></div>
   <div class="r"><span>Ditutup</span><span><?= $shift['closed_at'] ? tgl($shift['closed_at'], 'H:i') . ' ' . esc($shift['closer'] ?? '') : '-' ?></span></div>

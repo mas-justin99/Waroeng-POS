@@ -5,7 +5,7 @@
 <form class="d-flex gap-2 flex-wrap" method="get"><input type="date" name="from" class="form-control" value="<?= esc($from) ?>" style="width:auto"><input type="date" name="to" class="form-control" value="<?= esc($to) ?>" style="width:auto"><button class="btn btn-soft"><i class="bi bi-funnel"></i> Terapkan</button></form></div>
 <div class="card-x anim"><div class="table-wrap rtw"><table class="table-x rt"><thead><tr><th>Tanggal</th><th>Shift</th><th>Kasir</th><th>Buka – Tutup</th><th class="text-end">Modal</th><th class="text-end">Penjualan</th><th class="text-end">Selisih kas</th><th>Status</th><th></th></tr></thead><tbody>
 <?php foreach ($rows as $r): $d = (float) $r['cash_diff']; ?>
-<tr><td data-l="Tanggal"><?= tgl($r['shift_date'], 'd M Y') ?></td><td data-l="Shift"><b><?= esc(ShiftService::LABELS[$r['shift_no']]) ?></b></td><td data-l="Kasir"><?= esc($r['opener']) ?></td>
+<tr><td data-l="Tanggal"><?= tgl($r['shift_date'], 'd M Y') ?></td><td data-l="Shift"><b><?= esc(ShiftService::label($r)) ?></b></td><td data-l="Kasir"><?= esc($r['opener']) ?></td>
 <td data-l="Jam"><?= tgl($r['opened_at'], 'H:i') ?> – <?= $r['closed_at'] ? tgl($r['closed_at'], 'H:i') : '…' ?></td>
 <td class="text-end num" data-l="Modal"><?= rupiah($r['opening_cash']) ?></td>
 <td class="text-end num" data-l="Penjualan"><?= $r['status'] === 'closed' ? rupiah($r['sales_total']) : '-' ?></td>

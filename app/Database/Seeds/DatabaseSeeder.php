@@ -29,6 +29,7 @@ class DatabaseSeeder extends Seeder
             $db->table('users')->insertBatch([
                 $mk('Owner', 'admin', 'admin123', 'admin', null),
                 $mk('Kasir Pusat', 'kasir', 'kasir123', 'cashier', 1),
+                $mk('Kasir Pusat 2', 'kasir_b', 'kasir123', 'cashier', 1),
                 $mk('Dapur Pusat', 'dapur', 'dapur123', 'kitchen', 1),
                 $mk('Kasir Cabang 2', 'kasir2', 'kasir123', 'cashier', 2),
                 $mk('Dapur Cabang 2', 'dapur2', 'dapur123', 'kitchen', 2),
@@ -63,7 +64,7 @@ class DatabaseSeeder extends Seeder
             ];
             foreach ($p as [$sku, $n, $c, $price, $hpp]) {
                 $db->table('products')->insert(['sku' => $sku, 'name' => $n, 'category_id' => $c, 'price' => $price,
-                    'hpp' => $hpp, 'is_active' => 1, 'created_at' => $now, 'updated_at' => $now]);
+                    'hpp' => $hpp, 'is_active' => 1, 'is_bar' => $c === 3 ? 1 : 0, 'created_at' => $now, 'updated_at' => $now]);
             }
         }
     }

@@ -20,6 +20,7 @@ $menu = [
     ['/admin/categories', 'bi-tags', 'Kategori', []],
     ['/admin/reports', 'bi-graph-up-arrow', 'Laporan', [], 'Laporan'],
     ['/admin/locations', 'bi-geo-alt', 'Lokasi Resto', []],
+    ['/admin/printers', 'bi-printer', 'Printer Bar', []],
     ['/admin/users', 'bi-people', 'Pengguna', []],
     ['/admin/payment-methods', 'bi-credit-card-2-front', 'Metode Bayar', []],
   ]],

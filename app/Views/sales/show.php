@@ -3,6 +3,7 @@
 <?= $this->section('content') ?>
 <div class="page-head anim"><div><a href="/sales" class="small"><i class="bi bi-arrow-left"></i> Riwayat</a><h2><?= esc($sale['invoice_no']) ?> <?= po_badge($sale['status']) ?></h2></div>
   <div class="d-flex gap-2"><a class="btn btn-soft" target="_blank" href="/pos/receipt/<?= $sale['id'] ?>?print=1"><i class="bi bi-printer"></i> Cetak Struk</a>
+  <?php if ($sale['status'] === 'paid'): ?><form method="post" action="/sales/<?= $sale['id'] ?>/print-bar" class="d-inline"><?= csrf_field() ?><button class="btn btn-soft"><i class="bi bi-cup-straw"></i> Cetak Bar</button></form><?php endif; ?>
   <?php if ($sale['status'] === 'paid' && auth_user()['role'] === 'admin'): ?><button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#voidM"><i class="bi bi-x-octagon"></i> Void</button><?php endif; ?></div></div>
 <div class="row g-3">
   <div class="col-lg-8 anim"><div class="card-x"><div class="table-wrap"><table class="table-x"><thead><tr><th>Item</th><th class="text-end">Harga</th><th class="text-end">Qty</th><th class="text-end">Subtotal</th></tr></thead><tbody>

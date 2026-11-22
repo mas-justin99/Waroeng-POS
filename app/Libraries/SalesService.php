@@ -24,9 +24,11 @@ class SalesService
         }
         if (! $items) throw new RuntimeException('Keranjang kosong.');
 
-        $shift = ShiftService::current($locId);
+        $cu = db_connect()->table('users')->select('id, role')->where('id', $userId)->get()->getRowArray() ?: ['id' => $userId, 'role' => 'cashier'];
+        $shift = ShiftService::forUser($locId, $cu);
         if (! $shift) throw new RuntimeException('Kasir belum dibuka. Buka kasir dulu (isi modal awal & stok awal).');
 
+        $printDelta = $items; // [product_id => qty] yang perlu dicetak ke bar
         $db->transBegin();
         try {
             $prods = $db->table('products')->whereIn('id', array_keys($items))->where('is_active', 1)->get()->getResultArray();
@@ -113,6 +115,9 @@ class SalesService
             if ($billId) {
                 $bill = $db->query("SELECT id FROM table_bills WHERE id = ? AND location_id = ? AND status = 'open' FOR UPDATE", [$billId, $locId])->getRowArray();
                 if (! $bill) throw new RuntimeException('Bill meja sudah ditutup (mungkin sudah dibayar atau dibatalkan). Muat ulang halaman kasir.');
+                $printed = [];
+                foreach ($db->table('table_bill_items')->where('bill_id', $billId)->get()->getResultArray() as $bi) $printed[(int) $bi['product_id']] = (int) $bi['printed_qty'];
+                $printDelta = PrintService::delta($items, $printed);
                 $db->table('table_bills')->where('id', $billId)->update(['status' => 'paid', 'sale_id' => $saleId, 'closed_at' => $now, 'updated_at' => $now]);
             }
 
@@ -139,6 +144,11 @@ class SalesService
 
             if (! $db->transStatus()) throw new RuntimeException('Gagal menyimpan transaksi.');
             $db->transCommit();
+            PrintService::sendDelta($locId, $invoice, [
+                'table' => trim((string) ($in['table_no'] ?? '')), 'ref' => $invoice, 'cashier' => PrintService::userName($userId),
+                'order_type' => $db->table('sales')->select('order_type')->where('id', $saleId)->get()->getRowArray()['order_type'] ?? 'dine_in',
+                'customer' => trim((string) ($in['customer'] ?? '')),
+            ], $printDelta);
             return ['id' => $saleId, 'invoice_no' => $invoice, 'total' => $total, 'change' => $change];
         } catch (\Throwable $e) {
             $db->transRollback();

@@ -43,4 +43,18 @@ class Sales extends BaseController
         }
         return $this->back("/sales/$id", 'Transaksi di-void dan stok dikembalikan.');
     }
+
+    /** Cetak ulang order bar untuk transaksi ini. */
+    public function printBar(int $id)
+    {
+        $sale = $this->db->table('sales')->where('id', $id)->where('location_id', loc_id())->get()->getRowArray();
+        if (! $sale || $sale['status'] !== 'paid') return redirect()->to('/sales')->with('error', 'Transaksi tidak ditemukan.');
+        $q = [];
+        foreach ($this->db->table('sale_items')->where('sale_id', $id)->get()->getResultArray() as $i) $q[(int) $i['product_id']] = (int) $i['qty'];
+        $lines = \App\Libraries\PrintService::barLines($q);
+        $n = $lines ? \App\Libraries\PrintService::enqueue(loc_id(), 'reprint', $sale['invoice_no'], ['title' => 'ORDER BAR (ULANG)', 'table' => (string) $sale['table_no'], 'ref' => $sale['invoice_no'],
+            'cashier' => auth_user()['name'] ?? '', 'order_type' => $sale['order_type'], 'customer' => (string) $sale['customer_name']], $lines) : 0;
+        $msg = ! $lines ? 'Tidak ada item bar pada transaksi ini.' : ($n ? 'Order bar dikirim ulang ke printer.' : 'Belum ada printer bar aktif di outlet ini.');
+        return redirect()->to('/sales/' . $id)->with($n ? 'success' : 'error', $msg);
+    }
 }

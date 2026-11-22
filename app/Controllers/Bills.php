@@ -68,6 +68,9 @@ class Bills extends BaseController
         $b = $this->find($id);
         if (! $b || $b['status'] !== 'open') return $this->response->setStatusCode(404)->setJSON(['ok' => false, 'message' => 'Bill tidak ditemukan atau sudah ditutup.']);
         $now = date('Y-m-d H:i:s');
+        $printed = array_filter(\App\Libraries\BillService::printedMap($id));
+        \App\Libraries\PrintService::sendDelta(loc_id(), 'Meja ' . $b['table_no'], ['table' => $b['table_no'], 'ref' => 'Bill dibatalkan', 'cashier' => auth_user()['name'] ?? '', 'order_type' => $b['order_type']],
+            array_map(fn ($q) => -$q, $printed));
         $this->db->table('table_bills')->where('id', $id)->update(['status' => 'cancelled', 'closed_at' => $now, 'updated_at' => $now]);
         return $this->response->setJSON(['ok' => true]);
     }

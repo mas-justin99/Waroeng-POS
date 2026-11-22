@@ -31,6 +31,7 @@ class Products extends BaseController
         $data = [
             'sku' => $sku, 'name' => $name, 'category_id' => (int) $this->request->getPost('category_id') ?: null,
             'price' => max(0, (float) $this->request->getPost('price')), 'hpp' => max(0, (float) $this->request->getPost('hpp')),
+            'is_bar' => $this->request->getPost('is_bar') ? 1 : 0,
             'updated_at' => date('Y-m-d H:i:s'),
         ];
         $file = $this->request->getFile('image');

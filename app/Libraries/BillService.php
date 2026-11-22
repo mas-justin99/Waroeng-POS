@@ -15,6 +15,14 @@ class BillService
         return $rows;
     }
 
+    /** @return array<int,int> product_id => qty yang sudah tercetak ke bar */
+    public static function printedMap(int $billId): array
+    {
+        $m = [];
+        foreach (db_connect()->table('table_bill_items')->where('bill_id', $billId)->get()->getResultArray() as $r) $m[(int) $r['product_id']] = (int) $r['printed_qty'];
+        return $m;
+    }
+
     /** Perkiraan subtotal/diskon/service/pajak/total (rumus sama dengan checkout). */
     public static function totals(array $lines, array $bill, array $loc): array
     {
@@ -54,6 +62,7 @@ class BillService
             'discount_type' => ($in['discount_type'] ?? '') === 'percent' ? 'percent' : 'nominal',
             'discount_value' => max(0, (float) ($in['discount_value'] ?? 0)), 'updated_at' => $now,
         ];
+        $oldPrinted = [];
         $db->transBegin();
         try {
             $merged = false;
@@ -63,10 +72,12 @@ class BillService
                 if (! $bill) throw new RuntimeException('Bill tidak ditemukan atau sudah ditutup.');
                 if ($same && (int) $same['id'] !== $id) throw new RuntimeException('Meja ' . $table . ' sedang dipakai bill lain. Buka bill itu atau pilih meja lain.');
                 $db->table('table_bills')->where('id', $id)->update($meta + ['table_no' => $table]);
+                $oldPrinted = self::printedMap($id);
                 $db->table('table_bill_items')->where('bill_id', $id)->delete();
             } elseif ($same) { // meja sudah punya bill terbuka -> tambahkan pesanan
                 $id = (int) $same['id'];
                 $merged = true;
+                $oldPrinted = self::printedMap($id);
                 foreach ($db->table('table_bill_items')->where('bill_id', $id)->get()->getResultArray() as $old) {
                     $items[(int) $old['product_id']] = min(999, ($items[(int) $old['product_id']] ?? 0) + (int) $old['qty']);
                 }
@@ -77,9 +88,19 @@ class BillService
                 $id = (int) $db->insertID();
             }
             ksort($items);
-            foreach ($items as $pid => $q) $db->table('table_bill_items')->insert(['bill_id' => $id, 'product_id' => $pid, 'qty' => $q]);
+            // printed_qty: yang sudah tercetak ke bar; selisihnya dikirim sebagai ORDER (tambah) / BATAL (kurang)
+            $delta = PrintService::delta($items, $oldPrinted);
+            $barIds = array_column($db->table('products')->select('id')->whereIn('id', array_keys($items + $oldPrinted))->where('is_bar', 1)->get()->getResultArray(), 'id');
+            $delta = array_intersect_key($delta, array_flip($barIds));
+            foreach ($items as $pid => $q) {
+                $db->table('table_bill_items')->insert(['bill_id' => $id, 'product_id' => $pid, 'qty' => $q, 'printed_qty' => in_array($pid, $barIds) ? $q : 0]);
+            }
             if (! $db->transStatus()) throw new RuntimeException('Gagal menyimpan bill.');
             $db->transCommit();
+            PrintService::sendDelta($locId, 'Meja ' . $table, [
+                'table' => $table, 'ref' => 'Bill meja ' . $table, 'cashier' => PrintService::userName($userId),
+                'order_type' => $meta['order_type'], 'customer' => (string) ($meta['customer_name'] ?? ''),
+            ], $delta);
             return ['id' => $id, 'table_no' => $table, 'merged' => $merged];
         } catch (\Throwable $e) {
             $db->transRollback();

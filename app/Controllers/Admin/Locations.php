@@ -25,6 +25,7 @@ class Locations extends BaseController
             'phone' => trim((string) $this->request->getPost('phone')),
             'tax_percent' => min(100, max(0, (float) $this->request->getPost('tax_percent'))),
             'service_percent' => min(100, max(0, (float) $this->request->getPost('service_percent'))),
+            'register_count' => min(6, max(1, (int) $this->request->getPost('register_count') ?: 2)),
             'receipt_footer' => trim((string) $this->request->getPost('receipt_footer')), 'updated_at' => date('Y-m-d H:i:s'),
         ];
         if ($id) $this->db->table('locations')->where('id', $id)->update($data);

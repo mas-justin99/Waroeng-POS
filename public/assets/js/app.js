@@ -84,13 +84,14 @@
     const d = b.dataset;
     m.querySelectorAll('[name]').forEach(f => {
       if (f.type === 'file') return;
+      if (f.type === 'checkbox') { f.checked = d[f.name] === '1'; return; }
       const v = d[f.name]; if (v !== undefined) f.value = v; else if (f.dataset.default !== undefined) f.value = f.dataset.default; else if (f.name !== csrfName() && f.type !== 'hidden') f.value = '';
     });
     const t = m.querySelector('.modal-title'); if (t && d.title) t.textContent = d.title;
   });
   document.querySelectorAll('[data-new]').forEach(b => b.addEventListener('click', () => {
     const m = document.querySelector(b.dataset.new); if (!m) return;
-    m.querySelectorAll('[name]').forEach(f => { if (f.type !== 'hidden' && f.type !== 'file') f.value = f.dataset.default ?? ''; });
+    m.querySelectorAll('[name]').forEach(f => { if (f.type === 'checkbox') { f.checked = f.dataset.default === '1'; return; } if (f.type !== 'hidden' && f.type !== 'file') f.value = f.dataset.default ?? ''; });
     m.querySelector('[name=id]').value = '';
     const t = m.querySelector('.modal-title'); if (t && b.dataset.title) t.textContent = b.dataset.title;
   }));

@@ -9,71 +9,92 @@ use CodeIgniter\Exceptions\PageNotFoundException;
 /** Buka & tutup kasir (2 shift per hari). */
 class Shifts extends BaseController
 {
-    /** Halaman utama: form buka kasir, atau status shift yang sedang berjalan. */
+    /** Halaman utama: form buka kasir, atau status shift milik kasir ini. */
     public function index()
     {
         $loc   = loc_id();
-        $shift = ShiftService::current($loc);
+        $uid   = (int) auth_user()['id'];
+        $open  = ShiftService::openList($loc);
+        $shift = ShiftService::current($loc, $uid);
         if ($shift) {
             $shift['opener'] = $this->userName((int) $shift['cashier_id']);
-            return view('shift/running', ['shift' => $shift, 'sum' => ShiftService::summary($shift)]);
+            $others = array_values(array_filter($open, fn ($o) => (int) $o['id'] !== (int) $shift['id']));
+            return view('shift/running', ['shift' => $shift, 'sum' => ShiftService::summary($shift), 'others' => $others]);
         }
 
-        $used = array_map('intval', array_column(
-            $this->db->table('cash_shifts')->select('shift_no')->where('location_id', $loc)->where('shift_date', date('Y-m-d'))->get()->getResultArray(),
-            'shift_no'
-        ));
+        $regCount = max(1, (int) (loc_row()['register_count'] ?? 2));
+        $usedMap = [];
+        foreach ($this->db->table('cash_shifts')->select('register_no, shift_no')->where('location_id', $loc)->where('shift_date', date('Y-m-d'))->get()->getResultArray() as $r) {
+            $usedMap[(int) $r['register_no']][] = (int) $r['shift_no'];
+        }
+        $busy = [];
+        foreach ($open as $o) $busy[(int) $o['register_no']] = $o['opener'];
         $products = $this->db->query(
             'SELECT p.id, p.sku, p.name, COALESCE(s.qty,0) AS qty FROM products p
              LEFT JOIN stocks s ON s.product_id = p.id AND s.location_id = ?
              WHERE p.is_active = 1 ORDER BY p.name', [$loc])->getResultArray();
         $last = $this->db->table('cash_shifts')->where('location_id', $loc)->where('status', 'closed')->orderBy('id', 'DESC')->get(1)->getRowArray();
-        return view('shift/open', ['used' => $used, 'products' => $products, 'last' => $last]);
+        return view('shift/open', ['usedMap' => $usedMap, 'busy' => $busy, 'regCount' => $regCount, 'needCount' => ! $open,
+            'open' => $open, 'products' => $products, 'last' => $last]);
     }
 
     public function open()
     {
         $loc  = loc_id();
         $no   = (int) $this->request->getPost('shift_no');
+        $reg  = (int) $this->request->getPost('register_no') ?: 1;
         $cash = trim((string) $this->request->getPost('opening_cash'));
         $stk  = (array) $this->request->getPost('stock');
+        $regCount = max(1, (int) (loc_row()['register_count'] ?? 2));
 
         if (! isset(ShiftService::LABELS[$no])) return $this->back('/shift', 'Pilih shift 1 atau shift 2.', 'error')->withInput();
+        if ($reg < 1 || $reg > $regCount) return $this->back('/shift', 'Pilih kasir yang tersedia (Kasir 1 - ' . $regCount . ').', 'error')->withInput();
         $digits = preg_replace('/\D/', '', $cash);
         if ($digits === '') return $this->back('/shift', 'Uang modal wajib diisi (isi 0 bila tanpa modal).', 'error')->withInput();
         $cash = (float) $digits;
 
-        $products = $this->db->table('products')->select('id, name')->where('is_active', 1)->get()->getResultArray();
-        $count = [];
-        foreach ($products as $p) {
-            $v = $stk[$p['id']] ?? '';
-            if ($v === '' || ! ctype_digit((string) $v)) {
-                return $this->back('/shift', 'Stok awal "' . $p['name'] . '" wajib diisi (angka, isi 0 bila kosong).', 'error')->withInput();
-            }
-            $count[(int) $p['id']] = (int) $v;
-        }
-
         $db = $this->db;
         $db->transBegin();
         try {
-            if (ShiftService::current($loc)) throw new \RuntimeException('Masih ada shift yang belum ditutup di lokasi ini.');
-            $today = date('Y-m-d');
-            if ($db->table('cash_shifts')->where('location_id', $loc)->where('shift_date', $today)->where('shift_no', $no)->countAllResults()) {
-                throw new \RuntimeException(ShiftService::LABELS[$no] . ' hari ini sudah pernah dibuka.');
+            $uid = (int) auth_user()['id'];
+            if (ShiftService::current($loc, $uid)) throw new \RuntimeException('Anda masih punya shift yang belum ditutup.');
+            $open = ShiftService::openList($loc);
+            foreach ($open as $o) {
+                if ((int) $o['register_no'] === $reg) throw new \RuntimeException('Kasir ' . $reg . ' sedang dipakai oleh ' . $o['opener'] . '. Pilih kasir lain atau minta shiftnya ditutup dulu.');
             }
+            $today = date('Y-m-d');
+            if ($db->table('cash_shifts')->where('location_id', $loc)->where('shift_date', $today)->where('shift_no', $no)->where('register_no', $reg)->countAllResults()) {
+                throw new \RuntimeException(ShiftService::LABELS[$no] . ' · Kasir ' . $reg . ' hari ini sudah pernah dibuka.');
+            }
+
+            // Stok awal dihitung oleh kasir yang membuka pertama. Kasir berikutnya memakai stok outlet yang sedang berjalan.
+            $products = $db->table('products')->select('id, name')->where('is_active', 1)->get()->getResultArray();
+            $count = [];
+            if (! $open) {
+                foreach ($products as $p) {
+                    $v = $stk[$p['id']] ?? '';
+                    if ($v === '' || ! ctype_digit((string) $v)) {
+                        throw new \RuntimeException('Stok awal "' . $p['name'] . '" wajib diisi (angka, isi 0 bila kosong).');
+                    }
+                    $count[(int) $p['id']] = (int) $v;
+                }
+            }
+
             $now = date('Y-m-d H:i:s');
             $db->table('cash_shifts')->insert([
-                'location_id' => $loc, 'shift_no' => $no, 'shift_date' => $today, 'status' => 'open', 'cashier_id' => auth_user()['id'],
+                'location_id' => $loc, 'shift_no' => $no, 'register_no' => $reg, 'shift_date' => $today, 'status' => 'open', 'cashier_id' => $uid,
                 'opening_cash' => $cash, 'opening_note' => trim((string) $this->request->getPost('note')) ?: null, 'opened_at' => $now,
             ]);
             $shiftId = (int) $db->insertID();
 
             $cur = array_column($db->table('stocks')->select('product_id, qty')->where('location_id', $loc)->get()->getResultArray(), 'qty', 'product_id');
-            foreach ($count as $pid => $qty) {
+            foreach ($products as $p) {
+                $pid = (int) $p['id'];
                 $sys = (int) ($cur[$pid] ?? 0);
+                $qty = $count[$pid] ?? $sys; // kasir kedua dst: tanpa hitung ulang (angka = stok berjalan)
                 $db->table('shift_stocks')->insert(['shift_id' => $shiftId, 'product_id' => $pid, 'system_qty' => $sys, 'opening_qty' => $qty]);
                 if ($qty !== $sys) { // stok awal hasil hitung kasir menjadi acuan; selisih dicatat sebagai penyesuaian
-                    Inventory::move($loc, $pid, $qty - $sys, 'adjust', 'shift', $shiftId, 'Stok awal ' . ShiftService::LABELS[$no], (int) auth_user()['id'], null, true);
+                    Inventory::move($loc, $pid, $qty - $sys, 'adjust', 'shift', $shiftId, 'Stok awal ' . ShiftService::LABELS[$no] . ' Kasir ' . $reg, $uid, null, true);
                 }
             }
             $db->transCommit();
@@ -81,7 +102,7 @@ class Shifts extends BaseController
             $db->transRollback();
             return $this->back('/shift', $e->getMessage(), 'error')->withInput();
         }
-        return $this->back('/pos', ShiftService::LABELS[$no] . ' dibuka. Selamat bertugas!');
+        return $this->back('/pos', ShiftService::LABELS[$no] . ' · Kasir ' . $reg . ' dibuka. Selamat bertugas!');
     }
 
     public function closeForm()
@@ -119,7 +140,7 @@ class Shifts extends BaseController
             $db->transRollback();
             return $this->back('/shift/close', $e->getMessage(), 'error');
         }
-        return $this->back('/shifts/' . $shift['id'] . '/receipt', 'Kasir ditutup. Berikut struk penutupan shift.');
+        return $this->back('/shifts/' . $shift['id'] . '/receipt', ShiftService::label($shift) . ' ditutup. Berikut struk penutupan shift.');
     }
 
     public function history()
@@ -155,14 +176,20 @@ class Shifts extends BaseController
         ]);
     }
 
-    /** Shift terbuka di lokasi aktif, hanya boleh ditutup oleh pembukanya atau admin. */
+    /** Shift yang akan ditutup: milik kasir sendiri. Admin boleh menutup shift kasir mana pun lewat parameter s (id shift). */
     private function mine(): ?array
     {
-        $shift = ShiftService::current(loc_id());
-        if (! $shift) return null;
-        if (auth_user()['role'] !== 'admin' && (int) $shift['cashier_id'] !== (int) auth_user()['id']) {
-            return null;
+        $u = auth_user();
+        $loc = loc_id();
+        $sid = (int) ($this->request->getVar('s') ?? 0);
+        if ($u['role'] === 'admin') {
+            $shift = $sid
+                ? ($this->db->table('cash_shifts')->where('id', $sid)->where('location_id', $loc)->where('status', 'open')->get()->getRowArray() ?: null)
+                : (ShiftService::current($loc, (int) $u['id']) ?: ShiftService::current($loc));
+        } else {
+            $shift = ShiftService::current($loc, (int) $u['id']);
         }
+        if (! $shift) return null;
         $shift['opener'] = $this->userName((int) $shift['cashier_id']);
         return $shift;
     }

@@ -23,15 +23,17 @@ Tampilan terinspirasi LunaPOS / Jubelio POS: bersih, cepat dipelajari, dan diopt
 
 **Lainnya**
 - **Buka / Tutup Kasir (2 shift per hari):** sebelum berjualan kasir wajib memilih **Shift 1 (Pagi)** atau **Shift 2 (Sore)**, mengisi **uang modal**, dan **menghitung stok awal** semua menu (angka sudah terisi sesuai sistem; selisih otomatis dicatat sebagai penyesuaian stok). Halaman Kasir terkunci sampai kasir dibuka. Saat tutup, kasir mengisi uang kas hasil hitung; sistem menampilkan selisih terhadap *modal + penjualan tunai*, mencatat stok akhir, dan menyimpan rekap di **Riwayat Shift** (bisa dicetak). Satu lokasi hanya boleh punya satu shift terbuka, dan tiap shift hanya bisa dibuka sekali per hari.
-- **Struk Penutupan Shift:** begitu kasir menekan *Tutup Kasir*, muncul struk 80 mm berisi omset (subtotal, diskon, pajak, service, total), jumlah transaksi & porsi terjual, void, rincian per metode bayar, uang kasir (modal, penjualan tunai, seharusnya di laci, hasil hitung, **selisih**), daftar menu terjual, sisa stok akhir, serta kolom tanda tangan. Bisa dicetak ulang dari *Riwayat Shift* (pratinjau juga tersedia saat shift masih berjalan).
+- **Struk Penutupan Shift:** begitu kasir menekan *Tutup Kasir*, muncul struk 58 mm berisi omset (subtotal, diskon, pajak, service, total), jumlah transaksi & porsi terjual, void, rincian per metode bayar, uang kasir (modal, penjualan tunai, seharusnya di laci, hasil hitung, **selisih**), daftar menu terjual, sisa stok akhir, serta kolom tanda tangan. Bisa dicetak ulang dari *Riwayat Shift* (pratinjau juga tersedia saat shift masih berjalan).
 - **Reservasi + pengingat:** menu *Reservasi* (kasir, dapur, admin) untuk mencatat nama, no. HP, tanggal & jam, jumlah orang, meja, DP, dan catatan. Tab *Hari Ini / Mendatang / Lewat*, status (Dipesan → Terkonfirmasi → Datang / Tidak datang / Batal). Pengingat bisa diatur (tepat waktu, 15/30 menit, 1/2/3 jam, atau 1 hari sebelumnya): kartu pengingat muncul di layar + bunyi/getar + lencana di menu, sampai kasir menekan *Sudah diingatkan*. Tersedia tombol **WhatsApp** untuk mengirim pesan pengingat ke pelanggan. Hanya kasir/admin yang bisa input; dapur hanya melihat.
 - **DP reservasi:** nominal DP dicatat di form reservasi bersama **foto bukti/struk DP** (opsional). Di kasir ada metode bayar **DP Reservasi**: pilih reservasi pelanggan, nominal DP otomatis memotong tagihan (bisa digabung dengan tunai/QRIS/dll). Satu DP hanya bisa dipakai sekali; reservasi otomatis berstatus *Sudah datang*; bila transaksi di-void, DP kembali bisa dipakai. DP tidak dihitung sebagai uang tunai di laci saat tutup kasir, dan muncul sebagai baris "DP Reservasi" di struk penutupan. Jika DP lebih besar dari tagihan, hanya sebesar tagihan yang terpotong (sisanya perlu dikembalikan ke pelanggan secara manual).
 - **Kompres foto otomatis:** setiap unggah foto (foto produk, bukti DP) dikecilkan dulu di HP/browser (maks. 1600 px, JPEG ±80%) sehingga hemat kuota dan lolos batas unggah Vercel (4,5 MB), lalu dikompres lagi di server (GD) dan di Cloudinary. Foto 3 MB dari kamera HP biasanya menjadi sekitar 300-500 KB.
+- **Bill per meja:** di Kasir isi nomor meja lalu tekan **Simpan ke Meja**; pesanan tersimpan sebagai bill terbuka (belum dibayar). Meja yang sama otomatis digabung bila ditambah pesanan. Menu **Bill Meja** menampilkan semua meja terbuka (tambah pesanan / bayar / batalkan), dan tombol **Cetak Bill** mencetak bill sementara bertanda "BELUM DIBAYAR". Saat dibayar, bill ditutup dan ditautkan ke transaksi. Stok baru berkurang saat bill dibayar (bukan saat disimpan). Tutup kasir memperingatkan bila masih ada bill terbuka; bill tetap tersimpan untuk shift berikutnya.
+- **Cetak ke printer Bluetooth (mis. RPP02N):** Chrome tidak melihat printer Bluetooth lewat dialog cetak biasa, jadi halaman struk punya tombol sendiri: **Cetak Bluetooth (RawBT)** untuk printer Bluetooth klasik (pasang aplikasi RawBT dari Play Store, pasangkan printer di Bluetooth HP, pilih printer di RawBT) dan **Bluetooth Langsung** (Web Bluetooth, hanya untuk printer BLE; Chrome Android + https). Struk dikirim sebagai teks ESC/POS 32 kolom (58 mm) atau 48 kolom (80 mm). Logo tidak ikut tercetak di mode Bluetooth.
 - Multi lokasi: stok, PO, penjualan, pajak/service, dan footer struk terpisah per outlet. Admin dapat berpindah lokasi dari bar atas.
 - Peran: **Admin/Owner** (backoffice, semua lokasi), **Kasir**, **Dapur** (terkunci di lokasinya).
 - **1 akun = 1 perangkat.** Login di perangkat kedua ditolak selama perangkat pertama aktif; perangkat yang sama boleh login ulang. Admin bisa *Paksa Logout*.
 - Pembayaran lengkap & **split payment**: Tunai, QRIS, Kartu Debit, Kartu Kredit, Transfer Bank, GoPay, OVO, DANA, ShopeePay, LinkAja, GoFood, GrabFood, ShopeeFood, Voucher, Lainnya (bisa diaktif/nonaktifkan di backoffice).
-- Diskon (Rp / %), pajak & service per lokasi, tipe pesanan (makan di tempat / bawa pulang / antar), nomor meja, **struk 80 mm** siap cetak.
+- Diskon (Rp / %), pajak & service per lokasi, tipe pesanan (makan di tempat / bawa pulang / antar), nomor meja, **struk 58 mm** siap cetak (printer thermal 58 mm).
 - Void transaksi (admin) mengembalikan stok. Stok opname + batas stok minimum.
 - Dashboard admin: omzet, laba kotor, tren harian, jam ramai, metode bayar, menu terlaris, perbandingan lokasi, stok menipis, PO tertunda, siapa yang sedang online. Laporan penjualan / produk / PO + **ekspor CSV**.
 - Animasi halus (GSAP), PWA (bisa dipasang ke layar utama Android), cache aset untuk sinyal warung yang naik-turun.
@@ -43,6 +45,7 @@ Tampilan terinspirasi LunaPOS / Jubelio POS: bersih, cepat dipelajari, dan diopt
 | Admin / Owner | `admin` | `admin123` | semua |
 | Kasir | `kasir` | `kasir123` | Pusat |
 | Dapur | `dapur` | `dapur123` | Pusat |
+| Kasir ke-2 (outlet yang sama) | `kasir_b` | `kasir123` | Pusat |
 | Kasir / Dapur | `kasir2` / `dapur2` | `kasir123` / `dapur123` | Cabang 2 |
 
 > **Ganti semua password lewat menu Pengguna sebelum dipakai sungguhan.**
@@ -58,7 +61,7 @@ Tampilan terinspirasi LunaPOS / Jubelio POS: bersih, cepat dipelajari, dan diopt
    ```bash
    composer install
    copy .env.example .env          # lalu cek DATABASE_URL di dalamnya
-   php spark migrate                 # termasuk tabel shift, reservasi & DP
+   php spark migrate                 # termasuk shift, reservasi, DP, bill meja, 2 kasir & printer bar
    php spark db:seed DatabaseSeeder  # data awal: lokasi, akun, metode bayar, contoh menu
    php spark db:seed DemoSeeder      # (opsional) stok & transaksi 14 hari agar dashboard terisi
    ```
@@ -124,6 +127,23 @@ Begitu `logo.png` ada, otomatis dipakai menggantikan `logo.svg`. Warna merek ada
 Buka alamat aplikasi di Chrome → menu ⋮ → **Tambahkan ke layar utama**. Aplikasi terbuka layar penuh seperti aplikasi biasa. Untuk cetak struk: tombol *Cetak Struk* memakai dialog cetak browser (bisa diarahkan ke printer thermal lewat aplikasi printer di Android).
 
 ---
+
+## Dua kasir dalam satu outlet
+- Jumlah kasir (register) per outlet diatur di **Admin → Lokasi Resto → Jumlah kasir** (default 2).
+- Tiap kasir memakai akun & perangkat sendiri, memilih **Kasir 1 / Kasir 2** saat membuka shift, lalu punya modal, penjualan, dan penutupan sendiri. Kasir yang sedang dipakai tidak bisa dipilih ganda.
+- Stok awal hanya dihitung oleh kasir pertama yang membuka; kasir berikutnya langsung mulai (stok outlet dipakai bersama).
+- Admin bisa menutup shift kasir mana pun dari halaman Shift.
+
+## Print order bar (printer LAN/Ethernet)
+1. **Admin → Produk → Ubah**: centang **Bar** pada menu minuman (seed otomatis menandai kategori Minuman).
+2. **Admin → Printer Bar**: tambah printer (IP printer, port 9100, 58/80 mm, potong otomatis) lalu tekan **Tes**.
+3. Aplikasi di cloud (Vercel) tidak bisa menjangkau IP LAN. Jalankan **agen cetak** di satu komputer outlet yang satu jaringan dengan printer:
+   `php tools/print-agent/print-agent.php --url=https://DOMAIN --token=TOKEN` (token ada di halaman Printer Bar; bisa juga `start-agent.bat`). Butuh PHP 8 + ekstensi curl.
+   Opsi: `--interval=3`, `--hours=10-23` (batasi jam polling), `--cacert=...` / `--insecure` bila SSL Windows bermasalah.
+- Tiket tercetak otomatis saat **bayar langsung** (item bar) dan saat **simpan bill meja**. Pada bill hanya **selisih** yang dicetak: tambah pesanan → ORDER baru; kurangi/hapus/batal bill → tiket **BATAL**. Membayar bill yang sudah tercetak tidak mencetak ulang.
+- Cetak ulang: tombol **Cetak Bar** di detail transaksi, atau **Cetak ulang** di antrean printer.
+- Jika agen mati/printer mati, pesanan tetap masuk antrean dan dicoba ulang (maks. 5 kali), transaksi tidak terhambat.
+- Catatan Neon: agen yang polling terus membuat database tetap aktif; gunakan `--hours` agar sesuai jam buka.
 
 ## Cara kerja 1 akun = 1 perangkat
 

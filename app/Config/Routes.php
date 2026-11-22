@@ -8,6 +8,8 @@ $routes->setAutoRoute(false);
 $routes->get('login', 'Auth::login');
 $routes->post('login', 'Auth::attempt');
 $routes->get('manifest.webmanifest', 'Auth::manifest');
+$routes->post('print/agent/pull', 'PrintAgent::pull');
+$routes->post('print/agent/ack', 'PrintAgent::ack');
 
 $routes->group('', ['filter' => 'auth'], static function ($r) {
     $r->get('/', 'Home::index');
@@ -43,6 +45,7 @@ $routes->group('', ['filter' => 'auth'], static function ($r) {
         $r->get('receiving/(:num)', 'Receiving::show/$1');
         $r->post('stock/adjust', 'Stock::adjust');
     });
+    $r->post('sales/(:num)/print-bar', 'Sales::printBar/$1', ['filter' => 'role:cashier']);
     $r->post('sales/(:num)/void', 'Sales::void/$1', ['filter' => 'role:admin']);
 
     // Dapur
@@ -82,5 +85,12 @@ $routes->group('', ['filter' => 'auth'], static function ($r) {
         $r->post('payment-methods/save', 'PaymentMethods::save');
         $r->post('payment-methods/(:num)/toggle', 'PaymentMethods::toggle/$1');
         $r->get('reports', 'Reports::index');
+        $r->get('printers', 'Printers::index');
+        $r->post('printers/save', 'Printers::save');
+        $r->post('printers/token', 'Printers::token');
+        $r->post('printers/(:num)/toggle', 'Printers::toggle/$1');
+        $r->post('printers/(:num)/delete', 'Printers::delete/$1');
+        $r->post('printers/(:num)/test', 'Printers::test/$1');
+        $r->post('printers/job/(:num)/retry', 'Printers::retry/$1');
     });
 });

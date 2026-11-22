@@ -2,7 +2,7 @@
 <?php $title = 'Rekap Shift'; use App\Libraries\ShiftService; $open = $shift['status'] === 'open'; ?>
 <?= $this->section('content') ?>
 <div class="page-head anim"><div><a href="/shifts" class="small"><i class="bi bi-arrow-left"></i> Riwayat Shift</a>
-<h2><?= esc(ShiftService::LABELS[$shift['shift_no']]) ?> · <?= tgl($shift['shift_date'], 'd M Y') ?> <?= $open ? '<span class="badge-soft badge-success">Sedang buka</span>' : '<span class="badge-soft badge-secondary">Ditutup</span>' ?></h2>
+<h2><?= esc(ShiftService::label($shift)) ?> · <?= tgl($shift['shift_date'], 'd M Y') ?> <?= $open ? '<span class="badge-soft badge-success">Sedang buka</span>' : '<span class="badge-soft badge-secondary">Ditutup</span>' ?></h2>
 <div class="text-muted"><?= esc($shift['loc_name']) ?> · Dibuka <?= tgl($shift['opened_at']) ?> oleh <?= esc($shift['opener']) ?><?= $shift['closed_at'] ? ' · Ditutup ' . tgl($shift['closed_at']) . ' oleh ' . esc($shift['closer']) : '' ?></div></div>
 <div class="d-flex gap-2 no-print"><a class="btn btn-soft" target="_blank" href="/shifts/<?= $shift['id'] ?>/receipt"><i class="bi bi-receipt"></i> Struk Penutupan</a><?php if ($open): ?><a class="btn btn-primary" href="/shift/close"><i class="bi bi-lock"></i> Tutup Kasir</a><?php endif; ?></div></div>
 

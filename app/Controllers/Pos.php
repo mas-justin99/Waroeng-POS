@@ -10,7 +10,7 @@ class Pos extends BaseController
     public function index()
     {
         $loc = loc_id();
-        $shift = ShiftService::current($loc);
+        $shift = ShiftService::forUser($loc, auth_user());
         if (! $shift) {
             return redirect()->to('/shift')->with('error', 'Buka kasir dulu: isi uang modal dan hitung stok awal.');
         }
