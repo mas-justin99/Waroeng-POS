@@ -91,10 +91,12 @@
     <svg class="ok-ring" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45"/><path d="M30 52l14 14 27-30"/></svg>
     <h5 class="mb-1">Transaksi Berhasil</h5>
     <div class="text-muted small" id="ok-inv"></div>
+    <div class="alert-x warn d-none mt-2 text-start" id="ok-off"><i class="bi bi-cloud-slash"></i><span>Tersimpan di perangkat (offline). Dikirim otomatis saat internet kembali.</span></div>
     <div class="mt-3 text-muted">Kembalian</div><div class="fw-bold" style="font-size:1.8rem" id="ok-change">Rp 0</div>
   </div>
   <div class="modal-footer flex-column gap-2">
     <a class="btn btn-soft w-100" id="ok-print" target="_blank"><i class="bi bi-printer"></i> Cetak Struk</a>
+    <a class="btn btn-soft w-100 d-none" id="ok-bar" target="_blank"><i class="bi bi-cup-straw"></i> Cetak Bon Bar</a>
     <button class="btn btn-primary w-100" id="ok-new"><i class="bi bi-plus-lg"></i> Transaksi Baru</button>
   </div>
 </div></div></div>
@@ -111,8 +113,9 @@ window.POS = {
   bill: <?= json_encode($preBill ?? null, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>,
   dps: <?= json_encode($dps, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>,
   methods: <?= json_encode($methods, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>,
-  tax: <?= $tax ?>, service: <?= $service ?>
+  tax: <?= $tax ?>, service: <?= $service ?>,
+  offline: <?= json_encode($offline, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>
 };
 </script>
-<script src="<?= base_url('assets/js/pos.js') ?>?v=5"></script>
+<script src="<?= base_url('assets/js/pos.js') ?>?v=6"></script>
 <?= $this->endSection() ?>

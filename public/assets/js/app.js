@@ -22,12 +22,18 @@
   };
 
   // ---- POST JSON helper (CSRF otomatis)
-  window.api = async function (url, data) {
-    const r = await fetch(url, {
-      method: 'POST', credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrf(), 'Accept': 'application/json' },
-      body: JSON.stringify(data || {})
-    });
+  window.api = async function (url, data, timeoutMs) {
+    const ctl = timeoutMs ? new AbortController() : null, tm = ctl && setTimeout(() => ctl.abort(), timeoutMs);
+    let r;
+    try {
+      r = await fetch(url, {
+        method: 'POST', credentials: 'same-origin', signal: ctl ? ctl.signal : undefined,
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-CSRF-TOKEN': csrf(), 'Accept': 'application/json' },
+        body: JSON.stringify(data || {})
+      });
+    } catch (e) { const er = new Error('Tidak ada koneksi internet.'); er.network = true; throw er; }
+    finally { if (tm) clearTimeout(tm); }
+    if ([502, 503, 504].includes(r.status)) { const er = new Error('Server tidak dapat dihubungi.'); er.network = true; throw er; }
     if (r.status === 401) { const j = await r.json().catch(() => ({})); location.href = j.login || '/login'; throw new Error('Sesi berakhir'); }
     const j = await r.json().catch(() => ({ ok: false, message: 'Respon server tidak valid' }));
     if (!r.ok || j.ok === false) throw new Error(j.message || 'Terjadi kesalahan');
@@ -167,7 +173,7 @@
   })();
 
   // ---- Service worker (PWA ringan, hanya aset statis)
-  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('/sw.js').catch(() => {});
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('/sw.js').catch(() => {});
 
   document.addEventListener('DOMContentLoaded', () => {
     pageIn();

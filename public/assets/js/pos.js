@@ -231,20 +231,51 @@
   $('#lines').addEventListener('click', e => { if (e.target.closest('[data-a=rm]')) { state.pays.splice(+e.target.closest('.payline').dataset.i, 1); renderPay(); } });
   $('#quick').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; const c = state.pays.find(p => mById[p.method_id].type === 'cash'); if (c) { const others = state.pays.filter(p => p !== c).reduce((s, p) => s + (+p.amount || 0), 0); c.amount = Math.max(0, +b.dataset.v - others); renderPay(); } });
 
+  function showOk(ref, change, receiptUrl, offline, barUrl) {
+    $('#ok-inv').textContent = ref; $('#ok-change').textContent = rp(change); $('#ok-print').href = receiptUrl;
+    $('#ok-off').classList.toggle('d-none', !offline);
+    $('#ok-bar').classList.toggle('d-none', !barUrl); if (barUrl) $('#ok-bar').href = barUrl;
+    state.bill = null; billTag(); openCart(false); modal('#okModal').show();
+    if (window.gsap) { gsap.to('.ok-ring circle', { strokeDashoffset: 0, duration: .7, ease: 'power2.out' }); gsap.to('.ok-ring path', { strokeDashoffset: 0, duration: .5, delay: .55, ease: 'power2.out' }); }
+    else $$('.ok-ring circle,.ok-ring path').forEach(el => el.style.strokeDashoffset = 0);
+  }
+  /* Simpan transaksi di perangkat saat internet putus (struk + bon bar tetap bisa dicetak). */
+  async function saveOffline(payload, t) {
+    const O = P.offline || {};
+    if (state.bill) throw new Error('Bill meja butuh internet. Lepas bill (tombol "Lepas") lalu bayar langsung, atau tunggu internet kembali.');
+    if (state.pays.some(p => mById[p.method_id].type === 'dp')) throw new Error('Pembayaran DP reservasi butuh internet. Pilih metode lain.');
+    const ref = Offline.ref(), at = Offline.stamp();
+    const lines = Object.entries(state.cart).map(([id, q]) => ({ name: byId[id].name, qty: q, price: byId[id].price, sub: byId[id].price * q, bar: byId[id].is_bar ? 1 : 0 }));
+    payload = Object.assign({}, payload, { offline_ref: ref, offline_at: at, shift_id: O.shift_id || null });
+    const paidSum = state.pays.reduce((s, p) => s + (+p.amount || 0), 0), change = Math.max(0, paidSum - t.total);
+    let rem = change; // kembalian dipotong dari baris tunai (sama dengan server)
+    const pays = state.pays.map(p => { let a = +p.amount; if (mById[p.method_id].type === 'cash' && rem > 0) { const c = Math.min(rem, a); a -= c; rem -= c; } return { name: mById[p.method_id].name, amount: a }; }).filter(p => p.amount > 0);
+    const item = { uuid: payload.client_uuid, at, ref, payload, bar_printed: false, error: null,
+      receipt: { ref, at, cashier: O.cashier || '', loc: O.loc || {}, otype: state.otype, table: $('#table').value.trim(), customer: $('#cust').value.trim(), lines, sub: t.sub, disc: t.disc, svc: t.svc, tax: t.tax, total: t.total, pays, change } };
+    await Offline.add(item);
+    return item;
+  }
   $('#confirmPay').addEventListener('click', async () => {
     const btn = $('#confirmPay'); btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Memproses…';
+    const t = totals(), uuid = Offline.uuid();
+    const payload = {
+      items: Object.entries(state.cart).map(([id, qty]) => ({ id: +id, qty })), order_type: state.otype, table_no: $('#table').value, customer: $('#cust').value, client_uuid: uuid,
+      discount_type: state.dtype, discount_value: state.dval, bill_id: state.bill ? state.bill.id : null, payments: state.pays.map(p => ({ method_id: p.method_id, amount: +p.amount, reference: p.reference, reservation_id: p.reservation_id || null }))
+    };
     try {
-      const r = await api('/pos/checkout', {
-        items: Object.entries(state.cart).map(([id, qty]) => ({ id: +id, qty })), order_type: state.otype, table_no: $('#table').value, customer: $('#cust').value,
-        discount_type: state.dtype, discount_value: state.dval, bill_id: state.bill ? state.bill.id : null, payments: state.pays.map(p => ({ method_id: p.method_id, amount: +p.amount, reference: p.reference, reservation_id: p.reservation_id || null }))
-      });
-      // kurangi stok lokal
-      for (const [id, q] of Object.entries(state.cart)) byId[id].stock -= q;
+      let r, offItem = null;
+      try { r = await api('/pos/checkout', payload, 15000); }
+      catch (err) {
+        if (!err.network) throw err;
+        offItem = await saveOffline(payload, t); // koneksi putus: simpan di perangkat (uuid sama => aman dari dobel)
+      }
+      for (const [id, q] of Object.entries(state.cart)) byId[id].stock -= q; // kurangi stok lokal
       modal('#payModal').hide();
-      $('#ok-inv').textContent = r.invoice_no; $('#ok-change').textContent = rp(r.change); $('#ok-print').href = '/pos/receipt/' + r.id; state.bill = null; billTag();
-      openCart(false); modal('#okModal').show();
-      if (window.gsap) { gsap.to('.ok-ring circle', { strokeDashoffset: 0, duration: .7, ease: 'power2.out' }); gsap.to('.ok-ring path', { strokeDashoffset: 0, duration: .5, delay: .55, ease: 'power2.out' }); }
-      else $$('.ok-ring circle,.ok-ring path').forEach(el => el.style.strokeDashoffset = 0);
+      if (offItem) {
+        const hasBar = offItem.receipt.lines.some(l => l.bar);
+        showOk(offItem.ref, offItem.receipt.change, '/offline/receipt?u=' + encodeURIComponent(uuid), true, hasBar ? '/offline/receipt?bar=1&u=' + encodeURIComponent(uuid) : '');
+        Offline.sync();
+      } else showOk(r.invoice_no, r.change, '/pos/receipt/' + r.id, false, '');
     } catch (err) { const e = $('#payErr'); e.textContent = err.message; e.classList.remove('d-none'); Toast.show(err.message, 'err'); }
     finally { btn.innerHTML = '<i class="bi bi-check2-circle"></i> Selesaikan Transaksi'; updSum(); }
   });

@@ -8,6 +8,7 @@ $routes->setAutoRoute(false);
 $routes->get('login', 'Auth::login');
 $routes->post('login', 'Auth::attempt');
 $routes->get('manifest.webmanifest', 'Auth::manifest');
+$routes->get('offline/receipt', 'Pos::offlineReceipt');
 $routes->post('print/agent/pull', 'PrintAgent::pull');
 $routes->post('print/agent/ack', 'PrintAgent::ack');
 
@@ -21,6 +22,7 @@ $routes->group('', ['filter' => 'auth'], static function ($r) {
     $r->group('', ['filter' => 'role:cashier'], static function ($r) {
         $r->get('pos', 'Pos::index');
         $r->post('pos/checkout', 'Pos::checkout');
+        $r->get('csrf', 'Pos::csrf');
         $r->get('pos/receipt/(:num)', 'Pos::receipt/$1');
         $r->get('bills', 'Bills::index');
         $r->get('bills/list', 'Bills::list');

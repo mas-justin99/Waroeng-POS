@@ -262,3 +262,4 @@ a{color:var(--primary);text-decoration:none} a:hover{color:var(--primary-600)}
 .cart-bill{display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--primary-soft,#fdecee);color:var(--primary);border-radius:10px;padding:6px 10px;font-weight:600;font-size:.85rem;margin-bottom:8px}
 .cart-bill button{background:none;border:0;color:inherit;padding:0 2px}
 .dp-item .bd{font-size:.75rem}
+.alert-x.warn{background:#FFF4DB;color:#8A5A00}

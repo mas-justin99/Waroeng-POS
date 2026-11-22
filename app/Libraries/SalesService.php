@@ -17,6 +17,12 @@ class SalesService
         $loc = $db->table('locations')->where('id', $locId)->get()->getRowArray();
         if (! $loc) throw new RuntimeException('Lokasi tidak valid.');
 
+        // Idempotensi: transaksi dengan client_uuid yang sama tidak diproses dua kali (respon hilang / sinkron offline ulang)
+        $uuid = preg_match('/^[A-Za-z0-9\-]{16,40}$/', (string) ($in['client_uuid'] ?? '')) ? (string) $in['client_uuid'] : null;
+        $dup = fn () => $uuid ? $db->table('sales')->where('client_uuid', $uuid)->where('location_id', $locId)->get()->getRowArray() : null;
+        if ($d = $dup()) return ['id' => (int) $d['id'], 'invoice_no' => $d['invoice_no'], 'total' => (float) $d['total'], 'change' => (float) $d['change_amount'], 'duplicate' => true];
+        $offline = $uuid && ! empty($in['offline_ref']);
+
         $items = [];
         foreach ($in['items'] ?? [] as $it) {
             $q = (int) ($it['qty'] ?? 0);
@@ -26,6 +32,10 @@ class SalesService
 
         $cu = db_connect()->table('users')->select('id, role')->where('id', $userId)->get()->getRowArray() ?: ['id' => $userId, 'role' => 'cashier'];
         $shift = ShiftService::forUser($locId, $cu);
+        if ($offline && ! empty($in['shift_id'])) { // transaksi offline masuk ke shift saat transaksi terjadi (walau sudah ditutup)
+            $os = $db->table('cash_shifts')->where('id', (int) $in['shift_id'])->where('location_id', $locId)->get()->getRowArray();
+            if ($os && ((int) $os['cashier_id'] === $userId || $cu['role'] === 'admin')) $shift = $os;
+        }
         if (! $shift) throw new RuntimeException('Kasir belum dibuka. Buka kasir dulu (isi modal awal & stok awal).');
 
         $printDelta = $items; // [product_id => qty] yang perlu dicetak ke bar
@@ -82,11 +92,13 @@ class SalesService
             if ($change > $cashTender + 0.001) throw new RuntimeException('Kelebihan bayar hanya boleh pada pembayaran tunai.');
 
             // Buat nomor invoice
-            $prefix = 'INV/' . $loc['code'] . '/' . date('ymd') . '/';
+            $now = date('Y-m-d H:i:s');
+            $at = $offline ? strtotime((string) ($in['offline_at'] ?? '')) : false;
+            $created = ($at && $at <= time() && $at > time() - 14 * 86400) ? date('Y-m-d H:i:s', $at) : $now;
+            $prefix = 'INV/' . $loc['code'] . '/' . date('ymd', strtotime($created)) . '/';
             $n = $db->table('sales')->like('invoice_no', $prefix, 'after')->countAllResults() + 1;
             $invoice = $prefix . str_pad((string) $n, 4, '0', STR_PAD_LEFT);
 
-            $now = date('Y-m-d H:i:s');
             $db->table('sales')->insert([
                 'invoice_no' => $invoice, 'location_id' => $locId, 'cashier_id' => $userId, 'shift_id' => $shift['id'],
                 'order_type' => in_array($in['order_type'] ?? '', ['dine_in', 'take_away', 'delivery'], true) ? $in['order_type'] : 'dine_in',
@@ -94,13 +106,14 @@ class SalesService
                 'customer_name' => trim((string) ($in['customer'] ?? '')) ?: null,
                 'subtotal' => $subtotal, 'discount' => $discount, 'tax' => $tax, 'service' => $service,
                 'total' => $total, 'paid' => $tender, 'change_amount' => $change, 'cogs' => 0, 'status' => 'paid',
-                'note' => trim((string) ($in['note'] ?? '')) ?: null, 'created_at' => $now,
+                'note' => trim((string) ($in['note'] ?? '')) ?: null, 'created_at' => $created,
+                'client_uuid' => $uuid, 'offline_ref' => $offline ? mb_substr((string) $in['offline_ref'], 0, 40) : null,
             ]);
             $saleId = (int) $db->insertID();
 
             $cogs = 0;
             foreach ($lines as $l) {
-                $mv = Inventory::move($locId, (int) $l['p']['id'], -$l['qty'], 'sale', 'sale', $saleId, $invoice, $userId);
+                $mv = Inventory::move($locId, (int) $l['p']['id'], -$l['qty'], 'sale', 'sale', $saleId, $invoice, $userId, null, $offline);
                 $cost = $mv['avg_cost'];
                 $cogs += $cost * $l['qty'];
                 $db->table('sale_items')->insert([
@@ -148,10 +161,11 @@ class SalesService
                 'table' => trim((string) ($in['table_no'] ?? '')), 'ref' => $invoice, 'cashier' => PrintService::userName($userId),
                 'order_type' => $db->table('sales')->select('order_type')->where('id', $saleId)->get()->getRowArray()['order_type'] ?? 'dine_in',
                 'customer' => trim((string) ($in['customer'] ?? '')),
-            ], $printDelta);
+            ], ! empty($in['bar_printed']) ? [] : $printDelta); // bon bar sudah dicetak dari perangkat saat offline
             return ['id' => $saleId, 'invoice_no' => $invoice, 'total' => $total, 'change' => $change];
         } catch (\Throwable $e) {
             $db->transRollback();
+            if ($d = $dup()) return ['id' => (int) $d['id'], 'invoice_no' => $d['invoice_no'], 'total' => (float) $d['total'], 'change' => (float) $d['change_amount'], 'duplicate' => true];
             throw $e instanceof RuntimeException ? $e : new RuntimeException('Gagal menyimpan transaksi: ' . $e->getMessage());
         }
     }

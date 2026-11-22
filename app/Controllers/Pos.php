@@ -15,12 +15,12 @@ class Pos extends BaseController
             return redirect()->to('/shift')->with('error', 'Buka kasir dulu: isi uang modal dan hitung stok awal.');
         }
         $products = $this->db->query(
-            'SELECT p.id, p.sku, p.name, p.price, p.image_url, p.category_id, COALESCE(s.qty,0) AS stock
+            'SELECT p.id, p.sku, p.name, p.price, p.image_url, p.category_id, p.is_bar, COALESCE(s.qty,0) AS stock
              FROM products p LEFT JOIN stocks s ON s.product_id = p.id AND s.location_id = ?
              WHERE p.is_active = 1 ORDER BY p.name', [$loc])->getResultArray();
         foreach ($products as &$p) {
             $p['id'] = (int) $p['id']; $p['price'] = (float) $p['price']; $p['stock'] = (int) $p['stock'];
-            $p['category_id'] = (int) $p['category_id'];
+            $p['category_id'] = (int) $p['category_id']; $p['is_bar'] = (int) $p['is_bar'];
         }
         $l = loc_row();
         $preBill = null;
@@ -42,6 +42,8 @@ class Pos extends BaseController
                 WHERE location_id = ? AND dp_amount > 0 AND dp_sale_id IS NULL AND status IN ('booked','confirmed','arrived') AND reserved_at >= ?
                 ORDER BY reserved_at LIMIT 80", [$loc, date('Y-m-d 00:00:00', strtotime('-1 day'))])->getResultArray(),
             'tax' => (float) ($l['tax_percent'] ?? 0), 'service' => (float) ($l['service_percent'] ?? 0),
+            'offline' => ['shift_id' => (int) $shift['id'], 'cashier' => auth_user()['name'] ?? '', 'user_id' => (int) auth_user()['id'],
+                'loc' => ['name' => $l['name'] ?? '', 'address' => $l['address'] ?? '', 'phone' => $l['phone'] ?? '', 'footer' => $l['receipt_footer'] ?? 'Terima kasih']],
         ]);
     }
 
@@ -66,5 +68,17 @@ class Pos extends BaseController
             'items' => $this->db->table('sale_items')->where('sale_id', $id)->get()->getResultArray(),
             'pays' => $this->db->table('sale_payments')->where('sale_id', $id)->get()->getResultArray(),
         ]);
+    }
+
+    /** Token CSRF segar (dipakai sinkron offline setelah cookie kedaluwarsa). */
+    public function csrf()
+    {
+        return $this->response->setJSON(['ok' => true, 'token' => csrf_hash()]);
+    }
+
+    /** Cangkang struk offline: tanpa data (publik). Isi struk dibaca dari antrean di perangkat. */
+    public function offlineReceipt()
+    {
+        return view('pos/offline_receipt');
     }
 }
