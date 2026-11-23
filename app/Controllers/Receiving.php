@@ -86,4 +86,36 @@ class Receiving extends BaseController
         $items = $this->db->table('goods_receipt_items i')->select('i.*, p.sku, p.name')->join('products p', 'p.id = i.product_id')->where('i.gr_id', $id)->get()->getResultArray();
         return view('receiving/show', compact('gr', 'items'));
     }
+
+    /** Hapus penerimaan barang: stok dikurangi sebesar qty yang diterima, qty diterima di PO dikembalikan. */
+    public function delete(int $id)
+    {
+        $db = $this->db;
+        $short = [];
+        $db->transBegin();
+        try {
+            $gr = $db->query('SELECT * FROM goods_receipts WHERE id = ? AND location_id = ? FOR UPDATE', [$id, loc_id()])->getRowArray();
+            if (! $gr) throw new \RuntimeException('Penerimaan tidak ditemukan.');
+            $po = $db->query('SELECT * FROM purchase_orders WHERE id = ? FOR UPDATE', [$gr['po_id']])->getRowArray();
+            $items = $db->table('goods_receipt_items')->where('gr_id', $id)->orderBy('product_id')->get()->getResultArray();
+            foreach ($items as $it) {
+                $mv = Inventory::move(loc_id(), (int) $it['product_id'], -(int) $it['qty'], 'receipt_void', 'gr', $id, 'Hapus ' . $gr['gr_number'], (int) auth_user()['id'], (float) $it['hpp'], true);
+                if ($mv['balance'] < 0) $short[] = $it['product_id'];
+                $db->table('purchase_order_items')->where('id', $it['po_item_id'])->set('qty_received', 'GREATEST(qty_received - ' . (int) $it['qty'] . ', 0)', false)->update();
+            }
+            $db->table('goods_receipt_items')->where('gr_id', $id)->delete();
+            $db->table('goods_receipts')->where('id', $id)->delete();
+            if ($po && $po['status'] !== 'cancelled') {
+                $t = $db->query('SELECT COALESCE(SUM(qty - qty_received),0) AS r, COALESCE(SUM(qty_received),0) AS got FROM purchase_order_items WHERE po_id = ?', [$po['id']])->getRowArray();
+                $st = (int) $t['got'] === 0 ? 'sent' : ((int) $t['r'] === 0 ? 'received' : 'partial');
+                $db->table('purchase_orders')->where('id', $po['id'])->update(['status' => $st, 'updated_at' => date('Y-m-d H:i:s')]);
+            }
+            $db->transCommit();
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            return $this->back('/receiving', $e->getMessage(), 'error');
+        }
+        $msg = 'Penerimaan ' . $gr['gr_number'] . ' dihapus, stok disesuaikan.' . ($short ? ' Perhatian: ' . count($short) . ' produk stoknya menjadi minus (sudah terpakai/terjual) — cek di Stok Warung.' : '');
+        return $this->back('/po/' . $gr['po_id'], $msg, $short ? 'error' : 'success');
+    }
 }

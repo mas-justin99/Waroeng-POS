@@ -29,6 +29,8 @@ class Sales extends BaseController
             'sale' => $sale,
             'items' => $this->db->table('sale_items')->where('sale_id', $id)->get()->getResultArray(),
             'pays' => $this->db->table('sale_payments')->where('sale_id', $id)->get()->getResultArray(),
+            'edits' => $this->db->table('sale_edits e')->select('e.*, u.name AS editor')->join('users u', 'u.id = e.user_id', 'left')->where('e.sale_id', $id)->orderBy('e.id', 'DESC')->get()->getResultArray(),
+            'canEdit' => SalesService::editBlock($sale, auth_user()) === null,
         ]);
     }
 
@@ -56,5 +58,32 @@ class Sales extends BaseController
             'cashier' => auth_user()['name'] ?? '', 'order_type' => $sale['order_type'], 'customer' => (string) $sale['customer_name']], $lines) : 0;
         $msg = ! $lines ? 'Tidak ada item bar pada transaksi ini.' : ($n ? 'Order bar dikirim ulang ke printer.' : 'Belum ada printer bar aktif di outlet ini.');
         return redirect()->to('/sales/' . $id)->with($n ? 'success' : 'error', $msg);
+    }
+
+    /** Form ubah transaksi. */
+    public function edit(int $id)
+    {
+        $sale = $this->db->table('sales s')->select('s.*, u.name AS cashier')->join('users u', 'u.id = s.cashier_id', 'left')->where('s.id', $id)->where('s.location_id', loc_id())->get()->getRowArray();
+        if (! $sale) throw \CodeIgniter\Exceptions\PageNotFoundException::forPageNotFound();
+        if ($m = SalesService::editBlock($sale, auth_user())) return $this->back("/sales/$id", $m, 'error');
+        $lines = $this->db->query('SELECT i.product_id AS id, i.name, i.sku, i.price, i.qty, COALESCE(s.qty,0) AS stock FROM sale_items i LEFT JOIN stocks s ON s.product_id = i.product_id AND s.location_id = ? WHERE i.sale_id = ? ORDER BY i.id', [loc_id(), $id])->getResultArray();
+        $products = $this->db->query('SELECT p.id, p.sku, p.name, p.price, COALESCE(s.qty,0) AS stock FROM products p LEFT JOIN stocks s ON s.product_id = p.id AND s.location_id = ? WHERE p.is_active = 1 ORDER BY p.name', [loc_id()])->getResultArray();
+        foreach ($lines as &$l) { $l['id'] = (int) $l['id']; $l['price'] = (float) $l['price']; $l['qty'] = (int) $l['qty']; $l['stock'] = (int) $l['stock']; }
+        foreach ($products as &$p) { $p['id'] = (int) $p['id']; $p['price'] = (float) $p['price']; $p['stock'] = (int) $p['stock']; }
+        [$sp, $tp] = SalesService::ratios($sale);
+        return view('sales/edit', ['sale' => $sale, 'lines' => $lines, 'products' => $products, 'sp' => $sp, 'tp' => $tp,
+            'methods' => $this->db->table('payment_methods')->where('is_active', 1)->where('type !=', 'dp')->orderBy('id')->get()->getResultArray()]);
+    }
+
+    public function update(int $id)
+    {
+        $sale = $this->db->table('sales')->where('id', $id)->where('location_id', loc_id())->get()->getRowArray();
+        if (! $sale) return $this->response->setStatusCode(404)->setJSON(['ok' => false, 'message' => 'Transaksi tidak ditemukan.']);
+        try {
+            $r = SalesService::edit($id, $this->request->getJSON(true) ?? [], auth_user());
+            return $this->response->setJSON(['ok' => true] + $r);
+        } catch (\Throwable $e) {
+            return $this->response->setStatusCode(422)->setJSON(['ok' => false, 'message' => $e->getMessage()]);
+        }
     }
 }

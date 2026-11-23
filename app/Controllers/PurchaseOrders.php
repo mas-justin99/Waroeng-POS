@@ -89,4 +89,19 @@ class PurchaseOrders extends BaseController
         $this->db->table('purchase_orders')->where('id', $id)->update(['status' => 'cancelled', 'updated_at' => date('Y-m-d H:i:s')]);
         return $this->back("/po/$id", 'PO dibatalkan.');
     }
+
+    /** Hapus PO. Bila sudah ada penerimaan barang, hapus penerimaannya dulu (stok menyesuaikan di sana). */
+    public function delete(int $id)
+    {
+        $po = $this->db->table('purchase_orders')->where('id', $id)->where('location_id', loc_id())->get()->getRowArray();
+        if (! $po) throw PageNotFoundException::forPageNotFound();
+        $n = $this->db->table('goods_receipts')->where('po_id', $id)->countAllResults();
+        if ($n) return $this->back("/po/$id", "PO ini sudah punya $n penerimaan barang. Hapus penerimaannya dulu (stok akan menyesuaikan), baru PO bisa dihapus.", 'error');
+        $this->db->transBegin();
+        $this->db->table('purchase_order_items')->where('po_id', $id)->delete();
+        $this->db->table('purchase_orders')->where('id', $id)->delete();
+        if (! $this->db->transStatus()) { $this->db->transRollback(); return $this->back("/po/$id", 'Gagal menghapus PO.', 'error'); }
+        $this->db->transCommit();
+        return $this->back('/po', 'PO ' . $po['po_number'] . ' dihapus.');
+    }
 }

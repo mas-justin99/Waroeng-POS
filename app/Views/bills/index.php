@@ -25,10 +25,26 @@
   </div>
 <?php endforeach; ?>
 </div>
+<?php if (! empty($past)): ?>
+<div class="card-x card-b anim mt-3"><div class="fw-bold mb-2">Riwayat bill</div>
+<?php foreach ($past as $p): $paid = $p['status'] === 'paid'; ?>
+<div class="list-row" data-row="<?= $p['id'] ?>"><div><b>Meja <?= esc($p['table_no']) ?></b> <small class="text-muted">· <?= tgl($p['opened_at']) ?></small><br>
+  <small class="text-muted"><?= $paid ? 'Dibayar' . ($p['invoice_no'] ? ' · ' . esc($p['invoice_no']) . ($p['sale_status'] === 'void' ? ' (void)' : '') : '') : 'Dibatalkan' ?></small></div>
+  <div class="ms-auto d-flex gap-2"><?php if ($paid && $p['sale_status'] === 'paid'): ?><a class="btn btn-sm btn-ghost" href="/sales/<?= (int) $p['sale_id'] ?>">Lihat transaksi</a><?php endif; ?>
+  <button class="btn btn-sm btn-ghost text-danger" data-del="<?= $p['id'] ?>" data-tbl="<?= esc($p['table_no'], 'attr') ?>"><i class="bi bi-trash"></i> Hapus</button></div></div>
+<?php endforeach; ?></div>
+<?php endif; ?>
 <?= $this->endSection() ?>
 <?= $this->section('scripts') ?>
 <script>
 document.addEventListener('click', async e => {
+  const d = e.target.closest('[data-del]');
+  if (d) {
+    if (!confirm('Hapus bill meja ' + d.dataset.tbl + ' secara permanen?')) return;
+    try { await api('/bills/' + d.dataset.del + '/delete', {}); d.closest('[data-row]').remove(); Toast.show('Bill dihapus.'); }
+    catch (err) { Toast.show(err.message, 'err'); }
+    return;
+  }
   const b = e.target.closest('[data-cancel]'); if (!b) return;
   if (!confirm('Batalkan bill meja ' + b.dataset.tbl + '? Pesanan di bill ini akan dihapus.')) return;
   try { await api('/bills/' + b.dataset.cancel + '/cancel', {}); b.closest('.bill').remove(); Toast.show('Bill dibatalkan.'); } catch (err) { Toast.show(err.message, 'err'); }

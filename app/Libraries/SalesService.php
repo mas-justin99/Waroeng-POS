@@ -170,6 +170,152 @@ class SalesService
         }
     }
 
+    /** Boleh mengubah transaksi? null = boleh, selain itu alasan penolakan. Admin: semua; kasir: transaksinya sendiri di shift yang masih terbuka. */
+    public static function editBlock(array $sale, array $user): ?string
+    {
+        if ($sale['status'] !== 'paid') return 'Hanya transaksi lunas yang bisa diubah.';
+        if ($user['role'] === 'admin') return null;
+        if ((int) $sale['cashier_id'] !== (int) $user['id']) return 'Kasir hanya bisa mengubah transaksinya sendiri.';
+        $sh = db_connect()->table('cash_shifts')->where('id', (int) $sale['shift_id'])->get()->getRowArray();
+        if (! $sh || $sh['status'] !== 'open') return 'Shift transaksi ini sudah ditutup. Minta admin untuk mengubahnya.';
+        return null;
+    }
+
+    /** Persen service & pajak yang berlaku saat transaksi (diturunkan dari angka tersimpan). */
+    public static function ratios(array $sale): array
+    {
+        $base = (float) $sale['subtotal'] - (float) $sale['discount'];
+        $sp = $base > 0 ? round((float) $sale['service'] / $base * 100, 2) : 0.0;
+        $tp = ($base + (float) $sale['service']) > 0 ? round((float) $sale['tax'] / ($base + (float) $sale['service']) * 100, 2) : 0.0;
+        return [$sp, $tp];
+    }
+
+    /**
+     * Ubah isi transaksi yang sudah lunas. Stok: qty dikurangi -> stok kembali; qty ditambah -> stok berkurang.
+     * Selisih total: kurang bayar -> pembayaran tambahan wajib; kelebihan -> dicatat sebagai pengembalian.
+     * @param array $in {items:[{id,qty}], discount, reason, payments:[{method_id,amount,reference}], refund_method_id}
+     */
+    public static function edit(int $saleId, array $in, array $user): array
+    {
+        $db = db_connect();
+        $uid = (int) $user['id'];
+        $reason = trim((string) ($in['reason'] ?? ''));
+        if ($reason === '') throw new RuntimeException('Alasan perubahan wajib diisi.');
+        $new = [];
+        foreach ($in['items'] ?? [] as $it) {
+            $q = (int) ($it['qty'] ?? 0);
+            if ($q > 0) $new[(int) $it['id']] = ($new[(int) $it['id']] ?? 0) + $q;
+        }
+        if (! $new) throw new RuntimeException('Transaksi harus punya minimal satu item. Untuk membatalkan seluruhnya gunakan Void.');
+
+        $db->transBegin();
+        try {
+            $s = $db->query('SELECT * FROM sales WHERE id = ? FOR UPDATE', [$saleId])->getRowArray();
+            if (! $s) throw new RuntimeException('Transaksi tidak ditemukan.');
+            if ($m = self::editBlock($s, $user)) throw new RuntimeException($m);
+            $locId = (int) $s['location_id'];
+
+            $oldRows = array_column($db->table('sale_items')->where('sale_id', $saleId)->get()->getResultArray(), null, 'product_id');
+            $add = array_diff(array_keys($new), array_keys($oldRows));
+            $prods = $add ? array_column($db->table('products')->whereIn('id', $add)->where('is_active', 1)->get()->getResultArray(), null, 'id') : [];
+            foreach ($add as $pid) if (! isset($prods[$pid])) throw new RuntimeException('Ada produk yang tidak aktif atau tidak ditemukan.');
+
+            // Total baru (harga item lama dipertahankan; item baru memakai harga sekarang)
+            $subtotal = 0;
+            foreach ($new as $pid => $q) $subtotal += ($oldRows[$pid]['price'] ?? $prods[$pid]['price']) * $q;
+            $dv = array_key_exists('discount', $in) ? max(0, (float) $in['discount']) : (float) $s['discount'];
+            $discount = min($dv, $subtotal);
+            [$sp, $tp] = self::ratios($s);
+            $base = $subtotal - $discount;
+            $service = round($base * $sp / 100);
+            $tax = round(($base + $service) * $tp / 100);
+            $total = $base + $service + $tax;
+            $diff = $total - (float) $s['total'];
+
+            // Stok & baris item
+            $cogs = 0;
+            $changes = [];
+            $barDelta = [];
+            $ids = array_unique(array_merge(array_keys($new), array_keys($oldRows)));
+            sort($ids);
+            foreach ($ids as $pid) {
+                $oq = (int) ($oldRows[$pid]['qty'] ?? 0);
+                $nq = (int) ($new[$pid] ?? 0);
+                $name = $oldRows[$pid]['name'] ?? $prods[$pid]['name'];
+                $cost = (float) ($oldRows[$pid]['cost'] ?? 0);
+                if ($nq !== $oq) {
+                    $mv = Inventory::move($locId, (int) $pid, $oq - $nq, 'sale_edit', 'sale', $saleId, 'Ubah ' . $s['invoice_no'], $uid, $oq ? $cost : null, $nq < $oq);
+                    if (! $oq) $cost = $mv['avg_cost'];
+                    $changes[] = ['name' => $name, 'old' => $oq, 'new' => $nq];
+                    $barDelta[$pid] = $nq - $oq;
+                }
+                if ($nq > 0) {
+                    $price = (float) ($oldRows[$pid]['price'] ?? $prods[$pid]['price']);
+                    $cogs += $cost * $nq;
+                    if ($oq && $nq !== $oq) $db->table('sale_items')->where('id', $oldRows[$pid]['id'])->update(['qty' => $nq, 'subtotal' => $price * $nq]);
+                    elseif (! $oq) $db->table('sale_items')->insert(['sale_id' => $saleId, 'product_id' => $pid, 'sku' => $prods[$pid]['sku'], 'name' => $name, 'qty' => $nq, 'price' => $price, 'cost' => $cost, 'subtotal' => $price * $nq]);
+                } elseif ($oq) {
+                    $db->table('sale_items')->where('id', $oldRows[$pid]['id'])->delete();
+                }
+            }
+            if (! $changes && abs($diff) < 0.001 && abs($discount - (float) $s['discount']) < 0.001) throw new RuntimeException('Tidak ada perubahan.');
+            if (! $changes) $cogs = (float) $s['cogs'];
+
+            // Selisih uang
+            $paid = (float) $s['paid'];
+            $changeAmt = (float) $s['change_amount'];
+            $note = null;
+            if ($diff > 0.001) {
+                $methods = array_column($db->table('payment_methods')->where('is_active', 1)->get()->getResultArray(), null, 'id');
+                $tender = 0; $cashT = 0; $pays = [];
+                foreach ($in['payments'] ?? [] as $pm) {
+                    $amt = (float) ($pm['amount'] ?? 0);
+                    $m = $methods[(int) ($pm['method_id'] ?? 0)] ?? null;
+                    if ($amt <= 0 || ! $m) continue;
+                    if ($m['type'] === 'dp') throw new RuntimeException('DP tidak bisa dipakai untuk pembayaran tambahan.');
+                    $pays[] = ['m' => $m, 'amount' => $amt, 'ref' => trim((string) ($pm['reference'] ?? '')) ?: null];
+                    $tender += $amt;
+                    if ($m['type'] === 'cash') $cashT += $amt;
+                }
+                if ($tender + 0.001 < $diff) throw new RuntimeException('Kekurangan bayar ' . rupiah($diff) . ', pembayaran tambahan baru ' . rupiah($tender) . '.');
+                $extraChange = $tender - $diff;
+                if ($extraChange > $cashT + 0.001) throw new RuntimeException('Kelebihan bayar hanya boleh pada pembayaran tunai.');
+                $rem = $extraChange;
+                foreach ($pays as $p) {
+                    $amt = $p['amount'];
+                    if ($p['m']['type'] === 'cash' && $rem > 0) { $c = min($rem, $amt); $amt -= $c; $rem -= $c; }
+                    if ($amt <= 0) continue;
+                    $db->table('sale_payments')->insert(['sale_id' => $saleId, 'method_id' => $p['m']['id'], 'method_name' => $p['m']['name'], 'amount' => $amt, 'reference' => $p['ref'] ?? 'Tambahan ubah transaksi']);
+                }
+                $paid += $tender;
+                $changeAmt += $extraChange;
+            } elseif ($diff < -0.001) {
+                $rm = $db->table('payment_methods')->where('id', (int) ($in['refund_method_id'] ?? 0))->where('is_active', 1)->where('type !=', 'dp')->get()->getRowArray()
+                    ?: $db->table('payment_methods')->where('type', 'cash')->where('is_active', 1)->orderBy('id')->get()->getRowArray();
+                if (! $rm) throw new RuntimeException('Metode untuk pengembalian tidak ditemukan.');
+                $db->table('sale_payments')->insert(['sale_id' => $saleId, 'method_id' => $rm['id'], 'method_name' => $rm['name'], 'amount' => $diff, 'reference' => 'Pengembalian ubah transaksi']);
+                $paid += $diff;
+            }
+
+            $db->table('sales')->where('id', $saleId)->update([
+                'subtotal' => $subtotal, 'discount' => $discount, 'service' => $service, 'tax' => $tax, 'total' => $total,
+                'paid' => $paid, 'change_amount' => $changeAmt, 'cogs' => round($cogs, 2), 'edit_count' => (int) $s['edit_count'] + 1,
+            ]);
+            $db->table('sale_edits')->insert([
+                'sale_id' => $saleId, 'user_id' => $uid, 'reason' => mb_substr($reason, 0, 200), 'old_total' => $s['total'], 'new_total' => $total, 'diff' => $diff,
+                'detail' => json_encode(['changes' => $changes, 'discount' => [(float) $s['discount'], $discount]], JSON_UNESCAPED_UNICODE), 'created_at' => date('Y-m-d H:i:s'),
+            ]);
+            if (! $db->transStatus()) throw new RuntimeException('Gagal menyimpan perubahan.');
+            $db->transCommit();
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            throw $e instanceof RuntimeException ? $e : new RuntimeException('Gagal mengubah transaksi: ' . $e->getMessage());
+        }
+        PrintService::sendDelta($locId, $s['invoice_no'] . ' (ubah)', ['table' => (string) $s['table_no'], 'ref' => $s['invoice_no'], 'cashier' => PrintService::userName($uid),
+            'order_type' => $s['order_type'], 'customer' => (string) $s['customer_name']], $barDelta);
+        return ['total' => $total, 'diff' => $diff, 'change' => $diff > 0 ? max(0, $paid - (float) $s['paid'] - $diff) : 0, 'changes' => count($changes)];
+    }
+
     public static function void(int $saleId, string $reason, int $userId): void
     {
         $db = db_connect();

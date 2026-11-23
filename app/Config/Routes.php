@@ -30,6 +30,7 @@ $routes->group('', ['filter' => 'auth'], static function ($r) {
         $r->get('bills/(:num)/print', 'Bills::print/$1');
         $r->post('bills/save', 'Bills::save');
         $r->post('bills/(:num)/cancel', 'Bills::cancel/$1');
+        $r->post('bills/(:num)/delete', 'Bills::delete/$1');
         $r->post('reservations/save', 'Reservations::save');
         $r->post('reservations/(:num)/status', 'Reservations::setStatus/$1');
         $r->get('shift', 'Shifts::index');
@@ -44,10 +45,13 @@ $routes->group('', ['filter' => 'auth'], static function ($r) {
         $r->get('receiving', 'Receiving::index');
         $r->get('receiving/receive/(:num)', 'Receiving::form/$1');
         $r->post('receiving/receive/(:num)', 'Receiving::store/$1');
+        $r->post('receiving/(:num)/delete', 'Receiving::delete/$1');
         $r->get('receiving/(:num)', 'Receiving::show/$1');
         $r->post('stock/adjust', 'Stock::adjust');
     });
     $r->post('sales/(:num)/print-bar', 'Sales::printBar/$1', ['filter' => 'role:cashier']);
+    $r->get('sales/(:num)/edit', 'Sales::edit/$1', ['filter' => 'role:cashier']);
+    $r->post('sales/(:num)/edit', 'Sales::update/$1', ['filter' => 'role:cashier']);
     $r->post('sales/(:num)/void', 'Sales::void/$1', ['filter' => 'role:admin']);
 
     // Dapur
@@ -55,6 +59,7 @@ $routes->group('', ['filter' => 'auth'], static function ($r) {
         $r->get('po/create', 'PurchaseOrders::create');
         $r->post('po/store', 'PurchaseOrders::store');
         $r->post('po/(:num)/cancel', 'PurchaseOrders::cancel/$1');
+        $r->post('po/(:num)/delete', 'PurchaseOrders::delete/$1');
     });
 
     // Dapur + Kasir

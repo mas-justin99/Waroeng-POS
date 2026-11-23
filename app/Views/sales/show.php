@@ -1,9 +1,10 @@
 <?= $this->extend('layouts/app') ?>
 <?php $title = 'Detail Transaksi'; ?>
 <?= $this->section('content') ?>
-<div class="page-head anim"><div><a href="/sales" class="small"><i class="bi bi-arrow-left"></i> Riwayat</a><h2><?= esc($sale['invoice_no']) ?> <?= po_badge($sale['status']) ?></h2></div>
+<div class="page-head anim"><div><a href="/sales" class="small"><i class="bi bi-arrow-left"></i> Riwayat</a><h2><?= esc($sale['invoice_no']) ?> <?= po_badge($sale['status']) ?><?= ! empty($sale['edit_count']) ? ' <span class="badge-soft badge-info">Diubah ' . (int) $sale['edit_count'] . 'x</span>' : '' ?></h2></div>
   <div class="d-flex gap-2"><a class="btn btn-soft" target="_blank" href="/pos/receipt/<?= $sale['id'] ?>?print=1"><i class="bi bi-printer"></i> Cetak Struk</a>
   <?php if ($sale['status'] === 'paid'): ?><form method="post" action="/sales/<?= $sale['id'] ?>/print-bar" class="d-inline"><?= csrf_field() ?><button class="btn btn-soft"><i class="bi bi-cup-straw"></i> Cetak Bar</button></form><?php endif; ?>
+  <?php if (! empty($canEdit)): ?><a class="btn btn-soft" href="/sales/<?= $sale['id'] ?>/edit"><i class="bi bi-pencil-square"></i> Ubah</a><?php endif; ?>
   <?php if ($sale['status'] === 'paid' && auth_user()['role'] === 'admin'): ?><button class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#voidM"><i class="bi bi-x-octagon"></i> Void</button><?php endif; ?></div></div>
 <div class="row g-3">
   <div class="col-lg-8 anim"><div class="card-x"><div class="table-wrap"><table class="table-x"><thead><tr><th>Item</th><th class="text-end">Harga</th><th class="text-end">Qty</th><th class="text-end">Subtotal</th></tr></thead><tbody>
@@ -21,6 +22,10 @@
     <div class="mt-3 mb-1 fw-bold">Pembayaran</div>
     <?php foreach ($pays as $p): ?><div class="list-row"><span><?= esc($p['method_name']) ?><?= $p['reference'] ? ' <small class="text-muted">(' . esc($p['reference']) . ')</small>' : '' ?></span><span class="ms-auto num"><?= rupiah($p['amount']) ?></span></div><?php endforeach; ?>
     <?php if ($sale['change_amount'] > 0): ?><div class="list-row"><span class="text-muted">Kembalian</span><span class="ms-auto num"><?= rupiah($sale['change_amount']) ?></span></div><?php endif; ?>
+    <?php if (! empty($edits)): ?><div class="mt-3 mb-1 fw-bold">Riwayat perubahan</div>
+    <?php foreach ($edits as $e): $d = json_decode($e['detail'] ?? '', true) ?: []; ?><div class="small mb-2"><b><?= tgl($e['created_at']) ?></b> · <?= esc($e['editor'] ?? '-') ?><br><span class="text-muted"><?= esc($e['reason']) ?></span>
+      <?php foreach ($d['changes'] ?? [] as $c): ?><br>• <?= esc($c['name']) ?>: <?= (int) $c['old'] ?> → <?= (int) $c['new'] ?><?php endforeach; ?>
+      <br>Total <?= rupiah($e['old_total']) ?> → <b><?= rupiah($e['new_total']) ?></b> (<?= $e['diff'] >= 0 ? '+' : '-' ?><?= rupiah(abs($e['diff'])) ?>)</div><?php endforeach; ?><?php endif; ?>
     <?php if ($sale['status'] === 'void'): ?><div class="alert-x err mt-3 mb-0"><i class="bi bi-x-octagon-fill"></i><span>Void: <?= esc($sale['void_reason']) ?></span></div><?php endif; ?>
   </div></div>
 </div>

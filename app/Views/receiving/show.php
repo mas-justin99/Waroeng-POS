@@ -2,6 +2,7 @@
 <?php $title = 'Detail Penerimaan'; ?>
 <?= $this->section('content') ?>
 <div class="page-head anim"><div><a href="/receiving" class="small"><i class="bi bi-arrow-left"></i> Penerimaan</a><h2><?= esc($gr['gr_number']) ?></h2><div class="text-muted">PO <?= esc($gr['po_number']) ?> · <?= tgl($gr['created_at']) ?> · diterima <?= esc($gr['receiver']) ?></div></div></div>
+<?php if (has_role('cashier')): ?><div class="mb-3 anim"><form method="post" action="/receiving/<?= $gr['id'] ?>/delete" data-confirm="Hapus penerimaan ini? Stok dikurangi sebesar qty yang diterima dan qty di PO dikembalikan."><?= csrf_field() ?><button class="btn btn-outline-danger"><i class="bi bi-trash"></i> Hapus Penerimaan</button></form></div><?php endif; ?>
 <?php if ($gr['notes']): ?><div class="alert-x ok anim"><i class="bi bi-chat-left-text"></i><span><?= esc($gr['notes']) ?></span></div><?php endif; ?>
 <div class="card-x anim"><div class="table-wrap"><table class="table-x"><thead><tr><th>SKU</th><th>Menu</th><th class="text-end">HPP</th><th class="text-end">Qty Diterima</th><th class="text-end">Nilai</th></tr></thead><tbody>
 <?php $t = 0; foreach ($items as $i): $t += $i['qty'] * $i['hpp']; ?><tr><td><b><?= esc($i['sku']) ?></b></td><td><?= esc($i['name']) ?></td><td class="text-end num"><?= rupiah($i['hpp']) ?></td><td class="text-end"><?= $i['qty'] ?></td><td class="text-end num"><?= rupiah($i['qty'] * $i['hpp']) ?></td></tr><?php endforeach; ?>
