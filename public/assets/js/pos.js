@@ -113,7 +113,8 @@
     discount_type: state.dtype, discount_value: state.dval, items: Object.entries(state.cart).map(([id, qty]) => ({ id: +id, qty })) });
   async function saveBill() {
     if (!$('#table').value.trim()) { Toast.show('Isi nomor meja dulu.', 'err'); $('#table').focus(); openCart(true); return null; }
-    const r = await api('/bills/save', billPayload());
+    const r = await api('/bills/save', Object.assign(billPayload(), { tablet_print: barOn() ? 1 : 0 }));
+    if (r && barOn() && hasBar(r.bar)) { lastBar = r.bar; sendBar(r.bar); }
     return r;
   }
   $('#saveBill').addEventListener('click', async () => {
@@ -231,10 +232,58 @@
   $('#lines').addEventListener('click', e => { if (e.target.closest('[data-a=rm]')) { state.pays.splice(+e.target.closest('.payline').dataset.i, 1); renderPay(); } });
   $('#quick').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; const c = state.pays.find(p => mById[p.method_id].type === 'cash'); if (c) { const others = state.pays.filter(p => p !== c).reduce((s, p) => s + (+p.amount || 0), 0); c.amount = Math.max(0, +b.dataset.v - others); renderPay(); } });
 
+
+  /* ---------- bon bar otomatis dari tablet ---------- */
+  const BC = {
+    get(k, d) { try { const v = localStorage.getItem('wmr_' + k); return v === null ? d : v; } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('wmr_' + k, v); } catch (e) {} }
+  };
+  const barOn = () => BC.get('autobar', '1') === '1' && !!window.EscPos;
+  let lastBar = null; // {order, cancel, meta} - untuk cetak ulang
+  const barBytes = bar => {
+    const cols = parseInt(BC.get('cols', '32'), 10) || 32, parts = [];
+    if (bar.order && bar.order.length) parts.push(EscPos.barTicket(bar.meta, bar.order, cols, 'ORDER BAR', false));
+    if (bar.cancel && bar.cancel.length) parts.push(EscPos.barTicket(bar.meta, bar.cancel, cols, 'BATAL BAR', true));
+    return parts.length ? EscPos.concat(parts) : null;
+  };
+  /** Kirim bon ke printer. Dipanggil sedekat mungkin dengan ketukan pengguna (RawBT/Bluetooth butuh gestur). @return true bila terkirim/dibuka */
+  async function sendBar(bar, quiet) {
+    const bytes = bar && barBytes(bar); if (!bytes) return false;
+    lastBar = bar;
+    try {
+      if (BC.get('barmode', 'rawbt') === 'bt') await EscPos.bluetooth(bytes); else EscPos.rawbt(bytes);
+      return true;
+    } catch (err) {
+      if (!quiet) Toast.show('Bon bar belum tercetak: ' + (err && err.name === 'NotFoundError' ? 'printer belum dipilih' : (err.message || err)) + '. Buka tombol gelas untuk cetak ulang.', 'err');
+      return false;
+    }
+  }
+  const hasBar = b => !!(b && ((b.order && b.order.length) || (b.cancel && b.cancel.length)));
+  $('#barCfg').addEventListener('click', () => {
+    $('#bc-on').checked = BC.get('autobar', '1') === '1'; $('#bc-mode').value = BC.get('barmode', 'rawbt'); $('#bc-cols').value = BC.get('cols', '32'); $('#bc-msg').textContent = '';
+    modal('#barModal').show();
+  });
+  $('#bc-on').addEventListener('change', e => BC.set('autobar', e.target.checked ? '1' : '0'));
+  $('#bc-mode').addEventListener('change', e => BC.set('barmode', e.target.value));
+  $('#bc-cols').addEventListener('change', e => BC.set('cols', e.target.value));
+  const bcMsg = (t, err) => { const m = $('#bc-msg'); m.textContent = t; m.style.color = err ? '#b91c1c' : ''; };
+  $('#bc-test').addEventListener('click', async () => {
+    const ok = await sendBar({ order: [['Es Teh Manis', 2], ['Kopi Susu', 1]], cancel: [], meta: { table: 'TES', ref: 'Tes cetak', cashier: (P.offline || {}).cashier || '', order_type: 'dine_in' } }, true).catch(() => false);
+    lastBar = null; bcMsg(ok ? 'Perintah cetak dikirim.' : 'Gagal. Pastikan printer menyala & Bluetooth aktif.', !ok);
+  });
+  $('#bc-last').addEventListener('click', async () => {
+    if (!lastBar) return bcMsg('Belum ada bon bar yang dicetak di sesi ini.', true);
+    const ok = await sendBar(lastBar, true); bcMsg(ok ? 'Perintah cetak dikirim.' : 'Gagal mengirim ke printer.', !ok);
+  });
+  $('#ok-bar').addEventListener('click', e => {
+    const a = $('#ok-bar'); if (!a.dataset.local) return; // offline: tautan ke halaman bon biasa
+    e.preventDefault(); if (lastBar) sendBar(lastBar);
+  });
+
   function showOk(ref, change, receiptUrl, offline, barUrl) {
     $('#ok-inv').textContent = ref; $('#ok-change').textContent = rp(change); $('#ok-print').href = receiptUrl;
     $('#ok-off').classList.toggle('d-none', !offline);
-    $('#ok-bar').classList.toggle('d-none', !barUrl); if (barUrl) $('#ok-bar').href = barUrl;
+    const ob = $('#ok-bar'); ob.classList.toggle('d-none', !barUrl); if (barUrl) { ob.dataset.local = barUrl === '#' ? '1' : ''; ob.href = barUrl; ob.target = barUrl === '#' ? '' : '_blank'; }
     state.bill = null; billTag(); openCart(false); modal('#okModal').show();
     if (window.gsap) { gsap.to('.ok-ring circle', { strokeDashoffset: 0, duration: .7, ease: 'power2.out' }); gsap.to('.ok-ring path', { strokeDashoffset: 0, duration: .5, delay: .55, ease: 'power2.out' }); }
     else $$('.ok-ring circle,.ok-ring path').forEach(el => el.style.strokeDashoffset = 0);
@@ -259,7 +308,7 @@
     const btn = $('#confirmPay'); btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Memproses…';
     const t = totals(), uuid = Offline.uuid();
     const payload = {
-      items: Object.entries(state.cart).map(([id, qty]) => ({ id: +id, qty })), order_type: state.otype, table_no: $('#table').value, customer: $('#cust').value, client_uuid: uuid,
+      items: Object.entries(state.cart).map(([id, qty]) => ({ id: +id, qty })), order_type: state.otype, table_no: $('#table').value, customer: $('#cust').value, client_uuid: uuid, tablet_print: barOn() ? 1 : 0,
       discount_type: state.dtype, discount_value: state.dval, bill_id: state.bill ? state.bill.id : null, payments: state.pays.map(p => ({ method_id: p.method_id, amount: +p.amount, reference: p.reference, reservation_id: p.reservation_id || null }))
     };
     try {
@@ -272,10 +321,19 @@
       for (const [id, q] of Object.entries(state.cart)) byId[id].stock -= q; // kurangi stok lokal
       modal('#payModal').hide();
       if (offItem) {
-        const hasBar = offItem.receipt.lines.some(l => l.bar);
-        showOk(offItem.ref, offItem.receipt.change, '/offline/receipt?u=' + encodeURIComponent(uuid), true, hasBar ? '/offline/receipt?bar=1&u=' + encodeURIComponent(uuid) : '');
+        const bl = offItem.receipt.lines.filter(l => l.bar).map(l => [l.name, l.qty]);
+        const bar = { order: bl, cancel: [], meta: { table: offItem.receipt.table, ref: offItem.ref, cashier: offItem.receipt.cashier, order_type: offItem.receipt.otype, customer: offItem.receipt.customer } };
+        const auto = barOn() && bl.length;
+        if (auto) lastBar = bar;
+        showOk(offItem.ref, offItem.receipt.change, '/offline/receipt?u=' + encodeURIComponent(uuid), true, bl.length ? (auto ? '#' : '/offline/receipt?bar=1&u=' + encodeURIComponent(uuid)) : '');
         Offline.sync();
-      } else showOk(r.invoice_no, r.change, '/pos/receipt/' + r.id, false, '');
+        if (auto && await sendBar(bar)) Offline.patch(uuid, { bar_printed: true });
+      } else {
+        const bar = r.bar, auto = barOn() && hasBar(bar);
+        if (auto) lastBar = bar;
+        showOk(r.invoice_no, r.change, '/pos/receipt/' + r.id, false, auto ? '#' : '');
+        if (auto) sendBar(bar);
+      }
     } catch (err) { const e = $('#payErr'); e.textContent = err.message; e.classList.remove('d-none'); Toast.show(err.message, 'err'); }
     finally { btn.innerHTML = '<i class="bi bi-check2-circle"></i> Selesaikan Transaksi'; updSum(); }
   });

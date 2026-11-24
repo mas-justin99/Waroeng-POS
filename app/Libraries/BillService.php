@@ -97,11 +97,11 @@ class BillService
             }
             if (! $db->transStatus()) throw new RuntimeException('Gagal menyimpan bill.');
             $db->transCommit();
-            PrintService::sendDelta($locId, 'Meja ' . $table, [
+            $bar = PrintService::sendDelta($locId, 'Meja ' . $table, [
                 'table' => $table, 'ref' => 'Bill meja ' . $table, 'cashier' => PrintService::userName($userId),
                 'order_type' => $meta['order_type'], 'customer' => (string) ($meta['customer_name'] ?? ''),
-            ], $delta);
-            return ['id' => $id, 'table_no' => $table, 'merged' => $merged];
+            ], $delta, ! empty($in['tablet_print']));
+            return ['id' => $id, 'table_no' => $table, 'merged' => $merged, 'bar' => $bar];
         } catch (\Throwable $e) {
             $db->transRollback();
             throw $e instanceof RuntimeException ? $e : new RuntimeException('Gagal menyimpan bill: ' . $e->getMessage());

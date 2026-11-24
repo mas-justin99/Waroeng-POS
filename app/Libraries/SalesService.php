@@ -157,12 +157,12 @@ class SalesService
 
             if (! $db->transStatus()) throw new RuntimeException('Gagal menyimpan transaksi.');
             $db->transCommit();
-            PrintService::sendDelta($locId, $invoice, [
+            $bar = PrintService::sendDelta($locId, $invoice, [
                 'table' => trim((string) ($in['table_no'] ?? '')), 'ref' => $invoice, 'cashier' => PrintService::userName($userId),
                 'order_type' => $db->table('sales')->select('order_type')->where('id', $saleId)->get()->getRowArray()['order_type'] ?? 'dine_in',
                 'customer' => trim((string) ($in['customer'] ?? '')),
-            ], ! empty($in['bar_printed']) ? [] : $printDelta); // bon bar sudah dicetak dari perangkat saat offline
-            return ['id' => $saleId, 'invoice_no' => $invoice, 'total' => $total, 'change' => $change];
+            ], ! empty($in['bar_printed']) ? [] : $printDelta, ! empty($in['tablet_print'])); // bon bar sudah dicetak dari perangkat (offline / tablet_print)
+            return ['id' => $saleId, 'invoice_no' => $invoice, 'total' => $total, 'change' => $change, 'bar' => $bar];
         } catch (\Throwable $e) {
             $db->transRollback();
             if ($d = $dup()) return ['id' => (int) $d['id'], 'invoice_no' => $d['invoice_no'], 'total' => (float) $d['total'], 'change' => (float) $d['change_amount'], 'duplicate' => true];

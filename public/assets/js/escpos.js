@@ -105,7 +105,34 @@
     onStatus('Terkirim ke ' + (dev.name || 'printer'));
   }
 
-  window.EscPos = { fromReceipt, rawbt, bluetooth, clean };
+  const OTYPE = { dine_in: 'Makan di Tempat', take_away: 'Bawa Pulang', delivery: 'Delivery' };
+  /** Bon bar (ORDER / BATAL) - sama dengan PrintService::ticket() di server. lines: [[nama, qty]] (qty positif). */
+  function barTicket(meta, lines, cols, title, neg) {
+    cols = cols || 32; meta = meta || {};
+    const b = [ESC, 0x40], put = str => { for (const ch of clean(str)) b.push(ch.charCodeAt(0)); b.push(LF); };
+    const align = n => b.push(ESC, 0x61, n), bold = on => b.push(ESC, 0x45, on ? 1 : 0), size = n => b.push(GS, 0x21, n);
+    align(1); bold(1); size(0x11); put(title || 'ORDER BAR'); size(0); bold(0); align(0);
+    if (meta.table) { bold(1); size(0x11); put('MEJA: ' + String(meta.table).slice(0, 12)); size(0); bold(0); }
+    const d = new Date(), z = n => String(n).padStart(2, '0');
+    const info = [];
+    if (meta.ref) info.push(meta.ref);
+    info.push(`${z(d.getDate())}/${z(d.getMonth() + 1)}/${d.getFullYear()} ${z(d.getHours())}:${z(d.getMinutes())}` + (meta.cashier ? '  ' + meta.cashier : ''));
+    if (meta.order_type) info.push((OTYPE[meta.order_type] || meta.order_type) + (meta.customer ? ' - ' + meta.customer : ''));
+    info.forEach(i => wrap(i, cols).forEach(put));
+    put('-'.repeat(cols));
+    for (const [name, qty] of lines) {
+      const q = (neg ? '-' : '') + Math.abs(qty) + 'x ', w = cols - q.length;
+      bold(1); size(0x01);
+      wrap(name, w).forEach((l, k) => put((k === 0 ? q : ' '.repeat(q.length)) + l));
+      size(0); bold(0);
+    }
+    put('-'.repeat(cols)); b.push(LF, LF, LF, LF); b.push(GS, 0x56, 0x42, 0x00);
+    return new Uint8Array(b);
+  }
+  const concat = parts => { const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0)); let o = 0; for (const p of parts) { out.set(p, o); o += p.length; } return out; };
+  const btReady = () => !!(dev && chr && dev.gatt.connected);
+
+  window.EscPos = { fromReceipt, rawbt, bluetooth, clean, barTicket, concat, btReady };
 
   /* Tombol di halaman struk: <div data-printbar> */
   document.addEventListener('DOMContentLoaded', () => {

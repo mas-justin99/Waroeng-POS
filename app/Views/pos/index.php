@@ -19,6 +19,7 @@
         <b style="font-size:1.05rem"><i class="bi bi-bag-heart text-primary"></i> Pesanan</b>
         <div class="d-flex gap-2">
           <button class="btn btn-sm btn-ghost" id="billsBtn"><i class="bi bi-receipt-cutoff"></i> Meja <span class="badge-soft badge-primary d-none" id="billsCnt">0</span></button>
+          <button class="btn btn-sm btn-ghost" id="barCfg" title="Bon bar otomatis"><i class="bi bi-cup-straw"></i></button>
           <button class="btn btn-sm btn-ghost" id="clear"><i class="bi bi-trash3"></i></button>
           <button class="btn btn-sm btn-ghost cart-close" id="closeCart"><i class="bi bi-x-lg"></i></button>
         </div>
@@ -96,13 +97,29 @@
   </div>
   <div class="modal-footer flex-column gap-2">
     <a class="btn btn-soft w-100" id="ok-print" target="_blank"><i class="bi bi-printer"></i> Cetak Struk</a>
-    <a class="btn btn-soft w-100 d-none" id="ok-bar" target="_blank"><i class="bi bi-cup-straw"></i> Cetak Bon Bar</a>
+    <a class="btn btn-soft w-100 d-none" id="ok-bar" href="#" target="_blank"><i class="bi bi-cup-straw"></i> Cetak Bon Bar</a>
     <button class="btn btn-primary w-100" id="ok-new"><i class="bi bi-plus-lg"></i> Transaksi Baru</button>
   </div>
 </div></div></div>
 <div class="modal fade" id="dpModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"><div class="modal-content">
   <div class="modal-header"><h5 class="modal-title">DP Reservasi</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
   <div class="modal-body"><div class="small text-muted mb-2">Pilih reservasi pelanggan yang sudah membayar DP. Nominal DP dipotong dari tagihan.</div><div id="dpList" class="d-grid gap-2"></div></div>
+</div></div></div>
+<div class="modal fade" id="barModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+  <div class="modal-header"><h5 class="modal-title"><i class="bi bi-cup-straw text-primary"></i> Bon Bar Otomatis</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <div class="form-check form-switch mb-3"><input class="form-check-input" type="checkbox" id="bc-on"><label class="form-check-label" for="bc-on">Cetak bon bar otomatis dari tablet ini setelah bayar / simpan bill</label></div>
+    <label class="form-label">Cara kirim ke printer</label>
+    <select class="form-select mb-2" id="bc-mode"><option value="rawbt">RawBT (Bluetooth klasik, mis. RPP02N) - layar sebentar pindah ke RawBT</option><option value="bt">Bluetooth langsung (printer BLE) - senyap, tanpa pindah aplikasi</option></select>
+    <label class="form-label">Lebar kertas</label>
+    <select class="form-select mb-3" id="bc-cols"><option value="32">58 mm (32 kolom)</option><option value="42">80 mm (42 kolom)</option><option value="48">80 mm kecil (48 kolom)</option></select>
+    <div class="d-flex gap-2 flex-wrap">
+      <button class="btn btn-soft" id="bc-test"><i class="bi bi-printer"></i> Tes cetak</button>
+      <button class="btn btn-soft" id="bc-last"><i class="bi bi-arrow-repeat"></i> Cetak ulang bon terakhir</button>
+    </div>
+    <div class="small text-muted mt-3" id="bc-hint">Pengaturan ini tersimpan di tablet ini saja. Bila diaktifkan, bon bar tidak dikirim lagi ke printer LAN (supaya tidak dobel), tapi tetap muncul di Layar Bar.</div>
+    <div class="small mt-2" id="bc-msg"></div>
+  </div>
 </div></div></div>
 <?= $this->endSection() ?>
 
@@ -117,5 +134,6 @@ window.POS = {
   offline: <?= json_encode($offline, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>
 };
 </script>
-<script src="<?= base_url('assets/js/pos.js') ?>?v=6"></script>
+<script src="<?= base_url('assets/js/escpos.js') ?>?v=2"></script>
+<script src="<?= base_url('assets/js/pos.js') ?>?v=7"></script>
 <?= $this->endSection() ?>

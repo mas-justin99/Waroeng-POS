@@ -71,6 +71,24 @@ class PrintService
         }
     }
 
+    /** Tampilkan di Layar Bar (tablet bar), terlepas dari ada/tidaknya printer. */
+    public static function board(int $locId, string $kind, string $ref, array $meta, array $lines): void
+    {
+        if (! $lines) return;
+        try {
+            $db = db_connect();
+            $db->table('bar_orders')->insert([
+                'location_id' => $locId, 'kind' => $kind, 'ref' => mb_substr($ref, 0, 60), 'table_no' => mb_substr((string) ($meta['table'] ?? ''), 0, 20) ?: null,
+                'order_type' => $meta['order_type'] ?? null, 'customer' => mb_substr((string) ($meta['customer'] ?? ''), 0, 100) ?: null,
+                'cashier' => mb_substr((string) ($meta['cashier'] ?? ''), 0, 100) ?: null, 'status' => 'new', 'created_at' => date('Y-m-d H:i:s'),
+            ]);
+            $id = (int) $db->insertID();
+            foreach ($lines as [$name, $qty]) $db->table('bar_order_items')->insert(['order_id' => $id, 'name' => $name, 'qty' => abs((int) $qty)]);
+        } catch (\Throwable $e) {
+            log_message('error', 'PrintService board: ' . $e->getMessage());
+        }
+    }
+
     /** Hanya baris produk bar dari daftar [product_id => qty]. @return array<int,array{0:string,1:int}> */
     public static function barLines(array $qtyByProduct): array
     {
@@ -82,13 +100,17 @@ class PrintService
     }
 
     /** Kirim selisih [product_id => delta]: positif = tiket ORDER, negatif = tiket BATAL. */
-    public static function sendDelta(int $locId, string $ref, array $meta, array $delta): void
+    public static function sendDelta(int $locId, string $ref, array $meta, array $delta, bool $skipQueue = false): array
     {
         $lines = self::barLines($delta);
         $add = array_values(array_filter($lines, fn ($l) => $l[1] > 0));
         $del = array_values(array_filter($lines, fn ($l) => $l[1] < 0));
-        if ($add) self::enqueue($locId, 'order', $ref, ['title' => 'ORDER BAR'] + $meta, $add);
-        if ($del) self::enqueue($locId, 'cancel', $ref, ['title' => 'BATAL BAR'] + $meta, $del);
+        if ($add) { self::board($locId, 'order', $ref, $meta, $add); if (! $skipQueue) self::enqueue($locId, 'order', $ref, ['title' => 'ORDER BAR'] + $meta, $add); }
+        if ($del) { self::board($locId, 'cancel', $ref, $meta, $del); if (! $skipQueue) self::enqueue($locId, 'cancel', $ref, ['title' => 'BATAL BAR'] + $meta, $del); }
+        // Data bon untuk dicetak dari tablet kasir (RawBT/Bluetooth). qty selalu positif.
+        $tk = fn ($rows) => array_map(fn ($l) => [$l[0], abs((int) $l[1])], $rows);
+        return ['order' => $tk($add), 'cancel' => $tk($del), 'meta' => ['table' => (string) ($meta['table'] ?? ''), 'ref' => (string) ($meta['ref'] ?? ''),
+            'cashier' => (string) ($meta['cashier'] ?? ''), 'order_type' => (string) ($meta['order_type'] ?? ''), 'customer' => (string) ($meta['customer'] ?? '')]];
     }
 
     /** Selisih: qty sekarang - qty yang sudah tercetak (semua id dari kedua sisi). */

@@ -134,6 +134,33 @@ Buka alamat aplikasi di Chrome → menu ⋮ → **Tambahkan ke layar utama**. Ap
 - Stok awal hanya dihitung oleh kasir pertama yang membuka; kasir berikutnya langsung mulai (stok outlet dipakai bersama).
 - Admin bisa menutup shift kasir mana pun dari halaman Shift.
 
+## Ubah transaksi & hapus PO / penerimaan / bill
+- **Ubah transaksi** (Riwayat Penjualan → detail → *Ubah*): ubah qty, hapus, atau tambah menu, serta diskon. Stok menyesuaikan otomatis (qty dikurangi → stok kembali; ditambah → stok berkurang). Selisih uang dihitung otomatis: **kurang bayar** → wajib menerima pembayaran tambahan; **kelebihan** → dicatat sebagai pengembalian (baris negatif di pembayaran, kas shift ikut berkurang). Item baru memakai harga sekarang, item lama tetap harga saat transaksi. Alasan wajib; semua perubahan tercatat di *Riwayat perubahan*. Item bar yang berubah mengirim tiket ORDER/BATAL ke printer bar.
+  Admin boleh mengubah semua transaksi; kasir hanya transaksinya sendiri selama shift masih terbuka. Mengubah transaksi di shift yang sudah ditutup (hanya admin) tidak mengubah angka laporan penutupan yang sudah tercetak.
+- **Hapus PO**: tombol *Hapus PO* di detail PO. Bila sudah ada penerimaan barang, hapus dulu penerimaannya.
+- **Hapus penerimaan**: stok dikurangi sebesar qty yang diterima, qty diterima di PO dikembalikan dan status PO menyesuaikan. Bila barang sudah terpakai, stok bisa menjadi minus dan muncul peringatan. Untuk mengoreksi qty: hapus penerimaan lalu terima ulang dengan jumlah yang benar. HPP rata-rata stok tidak dihitung mundur.
+- **Hapus bill meja**: Bill Meja → *Riwayat bill* → Hapus (bill terbuka ikut dibatalkan + tiket BATAL ke bar). Bill yang sudah dibayar baru bisa dihapus setelah transaksinya di-**Void**.
+- Jalankan `php spark migrate` (migrasi 000009: tabel riwayat perubahan).
+
+## Mode offline (internet / listrik putus)
+Kasir tetap bisa jualan saat internet putus. Syarat: halaman **Kasir (POS)** pernah dibuka sekali saat online di perangkat itu (Chrome, alamat https; lebih baik dipasang ke layar utama), dan baterai perangkat masih ada.
+- **Jualan offline:** menu & stok terakhir dari perangkat dipakai. Transaksi disimpan di perangkat dengan nomor sementara `OFF-…`, struk bertanda "Struk sementara", dan pil kuning di pojok menampilkan jumlah antrean.
+- **Cetak offline:** tombol Cetak Struk dan **Cetak Bon Bar** memakai RawBT. Printer WiFi/LAN didukung RawBT (jenis printer *Ethernet/WiFi*, isi IP, port 9100) dan tetap jalan selama WiFi lokal menyala. Printer Bluetooth tidak butuh WiFi sama sekali.
+- **Sinkron otomatis:** saat internet kembali transaksi dikirim berurutan, mendapat nomor invoice resmi, memakai waktu transaksi asli, dan masuk ke shift saat itu. Tiap transaksi punya ID unik sehingga **tidak bisa dobel** walau terkirim ulang.
+- **Bon bar:** bila sudah dicetak dari perangkat, server tidak mencetak ulang; bila belum, server mengantre ke printer bar saat sinkron.
+- Batasan: bill per meja dan pembayaran DP butuh internet; stok bisa menjadi minus bila stok lokal sudah habis (terlihat di laporan stok); tutup shift diblokir sampai antrean terkirim; kasir harus login ulang bila sesi habis (antrean tetap aman di perangkat).
+- Router/printer WiFi ikut mati saat listrik padam kecuali memakai UPS/powerbank; printer Bluetooth berbaterai paling tahan listrik padam.
+- Jalankan `php spark migrate` (migrasi 000008 menambah kolom `client_uuid` & `offline_ref`).
+
+## Layar Bar (tablet di bar, tanpa printer)
+- Buka menu **Layar Bar** (`/bar`) di tablet bar. Buat akun khusus (Admin → Pengguna, role **Dapur**) dan login di tablet itu; akun Kasir juga bisa membukanya.
+- Setiap pesanan yang berisi produk bertanda **Bar** muncul sebagai kartu (meja, daftar minuman, waktu tunggu). Kartu baru berbunyi (tekan **Aktifkan suara** sekali) dan berkedip; kartu >10 menit berwarna oranye.
+- Pesanan dari bayar langsung, simpan bill meja (hanya tambahan), dan ubah transaksi ikut muncul. Pengurangan/pembatalan muncul sebagai kartu **BATAL** hitam.
+- Bartender menekan **Selesai** setelah minuman dibuat; riwayat 12 terakhir ada di "Selesai terakhir" (bisa dikembalikan). Data lebih dari 3 hari dibersihkan otomatis.
+- Layar menyegarkan diri tiap 4 detik, menjaga layar tetap menyala, dan memberi peringatan merah bila koneksi putus. Printer bar (jika ada) tetap berfungsi bersamaan.
+- Catatan Neon: layar yang terbuka terus membuat database tetap aktif selama jam buka.
+- Jalankan `php spark migrate` (migrasi 000010).
+
 ## Print order bar (printer LAN/Ethernet)
 1. **Admin → Produk → Ubah**: centang **Bar** pada menu minuman (seed otomatis menandai kategori Minuman).
 2. **Admin → Printer Bar**: tambah printer (IP printer, port 9100, 58/80 mm, potong otomatis) lalu tekan **Tes**.
@@ -171,3 +198,15 @@ public/assets/           app.css, app.js, pos.js, logo & ikon
 - **Batas pengingat reservasi:** pengingat dicek tiap 60 detik oleh aplikasi yang sedang terbuka (HP/tablet kasir). Tidak ada notifikasi latar belakang saat aplikasi ditutup, dan pesan WhatsApp ke pelanggan dikirim manual lewat tombolnya (bukan otomatis).
 - Jika grafik/animasi gagal dimuat, fungsi kasir tetap berjalan (semua animasi bersifat tambahan).
 - Pengujian yang sudah dijalankan (113 pengecekan): alur login 1 perangkat, buka/tutup shift & struk penutupan, reservasi (validasi, status, pengingat, pemisahan lokasi), PO dapur → penerimaan kasir (sebagian & penuh) → penjualan split payment → void, seluruh halaman admin, ekspor CSV, upload foto, dan boot runtime Vercel — pada PostgreSQL. Jalur MySQL (Laragon) memakai SQL yang sama, tetapi belum dijalankan terhadap server MySQL sungguhan; bila menemukan masalah saat `php spark migrate`, gunakan Postgres lokal atau Neon.
+
+## Bon bar otomatis dari tablet kasir
+
+Tanpa PC/agen: setelah **bayar** atau **simpan bill**, tablet kasir langsung mencetak bon **ORDER BAR** (minuman bertanda "Bar") ke printer Bluetooth. Pengurangan pesanan pada bill mencetak **BATAL BAR**. Bekerja juga saat **offline**.
+
+- Tombol **gelas** di panel Pesanan → atur: aktif/mati, cara kirim, lebar kertas (58 mm = 32 kolom), **Tes cetak**, **Cetak ulang bon terakhir**. Pengaturan tersimpan per tablet.
+- **RawBT** (default, printer Bluetooth klasik seperti RPP02N): layar sebentar pindah ke RawBT lalu kembali. Di RawBT aktifkan *Auto print / Cetak langsung* agar tanpa dialog.
+- **Bluetooth langsung** (printer BLE): sekali pilih printer lewat **Tes cetak**, selanjutnya senyap.
+- Satu printer: bon bar keluar di printer yang sama dengan struk (sobek per bon). Dua printer (kasir & bar) dengan RawBT: pilih printer bar sebagai printer aktif RawBT bila ingin bon bar saja yang keluar di sana; atau gunakan Layar Bar + printer LAN.
+- Saat opsi ini aktif, bon **tidak** dikirim ke printer LAN (menghindari dobel), tapi tetap tampil di **Layar Bar**.
+- Pembatalan/penghapusan bill dari halaman Meja tetap mengirim BATAL ke printer LAN/Layar Bar.
+- Tanpa perubahan database (tidak perlu migrasi).
